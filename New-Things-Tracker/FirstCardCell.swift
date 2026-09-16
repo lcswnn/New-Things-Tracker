@@ -1,5 +1,27 @@
 import UIKit
 
+extension UIFont {
+    static func albertSans(_ weight: AlbertSansWeight, size: CGFloat) -> UIFont {
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .family: "Albert Sans",
+            .traits: [UIFontDescriptor.TraitKey.weight: weight.uiWeight]
+        ])
+        return UIFont(descriptor: descriptor, size: size)
+    }
+
+    enum AlbertSansWeight {
+        case regular, medium, semiBold, bold
+        var uiWeight: UIFont.Weight {
+            switch self {
+            case .regular:  return .regular
+            case .medium:   return .medium
+            case .semiBold: return .semibold
+            case .bold:     return .bold
+            }
+        }
+    }
+}
+
 struct First {
     let title: String
     let location: String
@@ -65,7 +87,7 @@ class FirstCardCell: UITableViewCell {
 
         largePhotoLabel.translatesAutoresizingMaskIntoConstraints = false
         largePhotoLabel.text = "PHOTO"
-        largePhotoLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        largePhotoLabel.font = UIFont.albertSans(.medium, size: 12)
         largePhotoLabel.textColor = UIColor.black.withAlphaComponent(0.25)
         largePhotoLabel.textAlignment = .center
         largePhotoView.addSubview(largePhotoLabel)
@@ -79,7 +101,7 @@ class FirstCardCell: UITableViewCell {
 
         smallPhotoLabel.translatesAutoresizingMaskIntoConstraints = false
         smallPhotoLabel.text = "PHOTO"
-        smallPhotoLabel.font = UIFont.systemFont(ofSize: 10, weight: .medium)
+        smallPhotoLabel.font = UIFont.albertSans(.medium, size: 10)
         smallPhotoLabel.textColor = UIColor.black.withAlphaComponent(0.25)
         smallPhotoLabel.textAlignment = .center
         smallPhotoView.addSubview(smallPhotoLabel)
@@ -89,7 +111,7 @@ class FirstCardCell: UITableViewCell {
         rightColumn.addSubview(extraCountContainer)
 
         extraCountLabel.translatesAutoresizingMaskIntoConstraints = false
-        extraCountLabel.font = UIFont.systemFont(ofSize: 17, weight: .medium)
+        extraCountLabel.font = UIFont.albertSans(.medium, size: 17)
         extraCountLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.55)
         extraCountLabel.textAlignment = .center
         extraCountContainer.addSubview(extraCountLabel)
@@ -105,23 +127,23 @@ class FirstCardCell: UITableViewCell {
         infoSection.addSubview(categoryContainer)
 
         categoryLabel.translatesAutoresizingMaskIntoConstraints = false
-        categoryLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        categoryLabel.font = UIFont.albertSans(.semiBold, size: 13)
         categoryLabel.textColor = UIColor(named: "DeepPineInk")
         categoryContainer.addSubview(categoryLabel)
 
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
-        dateLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        dateLabel.font = UIFont.albertSans(.regular, size: 14)
         dateLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.55)
         infoSection.addSubview(dateLabel)
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
+        titleLabel.font = UIFont.albertSans(.bold, size: 22)
         titleLabel.textColor = UIColor(named: "DeepPineInk")
         titleLabel.numberOfLines = 2
         infoSection.addSubview(titleLabel)
 
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        subtitleLabel.font = UIFont.albertSans(.regular, size: 14)
         subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.45)
         infoSection.addSubview(subtitleLabel)
 

@@ -8,15 +8,27 @@
 import UIKit
 import MapKit
 
+// Esri tile URLs use level/row/column order rather than the standard z/x/y
+private class EsriLightGrayTileOverlay: MKTileOverlay {
+    override func url(forTilePath path: MKTileOverlayPath) -> URL {
+        URL(string: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/\(path.z)/\(path.y)/\(path.x)")!
+    }
+}
+
 class ViewController: UIViewController {
+
+    private enum Tab { case home, stats, map }
+    private var currentTab: Tab = .home
 
     private var profileButtonView: UIButton!
     private var mapView: MKMapView!
+    private var statsView: UIView!
     private var islandBar: UIView!
     private var tableView: UITableView!
     private var homeButton: UIButton!
+    private var statsButton: UIButton!
     private var mapButton: UIButton!
-    private var isMapVisible = false
+    private var addButton: UIButton!
 
     private let sections: [(month: String, firsts: [First])] = [
         ("SEPTEMBER", [
@@ -47,8 +59,10 @@ class ViewController: UIViewController {
         navigationController?.navigationBar.isHidden = true
 
         setupMapView()
+        setupStatsView()
         setupProfileButton()
         setupIslandBar()
+        setupAddButton()
         setupCardsTable()
     }
 
@@ -56,13 +70,49 @@ class ViewController: UIViewController {
         mapView = MKMapView()
         mapView.translatesAutoresizingMaskIntoConstraints = false
         mapView.alpha = 0
+        mapView.delegate = self
+        mapView.showsCompass = false
+        mapView.showsScale = false
+
+        // Esri World Light Gray — white bg, country/state borders, free without API key
+        let tileOverlay = EsriLightGrayTileOverlay()
+        tileOverlay.canReplaceMapContent = true
+        mapView.addOverlay(tileOverlay, level: .aboveLabels)
+
         view.addSubview(mapView)
+
+        let esriLabel = UILabel()
+        esriLabel.translatesAutoresizingMaskIntoConstraints = false
+        esriLabel.text = "Powered by Esri"
+        esriLabel.font = UIFont.albertSans(.regular, size: 10)
+        esriLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.4)
+        view.addSubview(esriLabel)
 
         NSLayoutConstraint.activate([
             mapView.topAnchor.constraint(equalTo: view.topAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            esriLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            esriLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -26),
+        ])
+    }
+
+    private func setupStatsView() {
+        let statsVC = StatsViewController()
+        addChild(statsVC)
+        statsView = statsVC.view
+        statsView.translatesAutoresizingMaskIntoConstraints = false
+        statsView.isHidden = true
+        view.addSubview(statsView)
+        statsVC.didMove(toParent: self)
+
+        NSLayoutConstraint.activate([
+            statsView.topAnchor.constraint(equalTo: view.topAnchor),
+            statsView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            statsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            statsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
     }
 
@@ -72,19 +122,21 @@ class ViewController: UIViewController {
         profileButtonView.setImage(UIImage(systemName: "person.fill"), for: .normal)
         profileButtonView.tintColor = UIColor(named: "DeepPineInk")
         profileButtonView.backgroundColor = UIColor(named: "FogBackground")
-        profileButtonView.layer.cornerRadius = 17
+        profileButtonView.layer.cornerRadius = 20
         profileButtonView.layer.shadowColor = UIColor.black.cgColor
         profileButtonView.layer.shadowOpacity = 0.15
         profileButtonView.layer.shadowOffset = CGSize(width: 0, height: 3)
         profileButtonView.layer.shadowRadius = 6
         profileButtonView.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
+        profileButtonView.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
+        profileButtonView.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         view.addSubview(profileButtonView)
 
         NSLayoutConstraint.activate([
             profileButtonView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
             profileButtonView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            profileButtonView.widthAnchor.constraint(equalToConstant: 34),
-            profileButtonView.heightAnchor.constraint(equalToConstant: 34),
+            profileButtonView.widthAnchor.constraint(equalToConstant: 40),
+            profileButtonView.heightAnchor.constraint(equalToConstant: 40),
         ])
     }
 
@@ -122,13 +174,15 @@ class ViewController: UIViewController {
             islandBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
             islandBar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             islandBar.heightAnchor.constraint(equalToConstant: 60),
-            islandBar.widthAnchor.constraint(equalToConstant: 160),
+            islandBar.widthAnchor.constraint(equalToConstant: 230),
         ])
 
-        homeButton = makeIslandButton(image: UIImage(named: "icon-house"), action: #selector(homeTapped))
-        mapButton  = makeIslandButton(image: UIImage(named: "icon-map"),   action: #selector(mapTapped))
+        homeButton  = makeIslandButton(image: UIImage(named: "icon-house"),         action: #selector(homeTapped))
+        statsButton = makeIslandButton(image: UIImage(systemName: "chart.bar.fill"), action: #selector(statsTapped))
+        mapButton   = makeIslandButton(image: UIImage(named: "icon-map"),            action: #selector(mapTapped))
 
         islandBar.addSubview(homeButton)
+        islandBar.addSubview(statsButton)
         islandBar.addSubview(mapButton)
 
         updateIslandSelection()
@@ -137,8 +191,38 @@ class ViewController: UIViewController {
             homeButton.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor, constant: 28),
             homeButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
 
+            statsButton.centerXAnchor.constraint(equalTo: islandBar.centerXAnchor),
+            statsButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+
             mapButton.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: -28),
             mapButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+        ])
+    }
+
+    private func setupAddButton() {
+        addButton = UIButton(type: .system)
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        addButton.setImage(UIImage(systemName: "plus", withConfiguration: config), for: .normal)
+        addButton.tintColor = UIColor(named: "FogBackground")
+        addButton.backgroundColor = UIColor(named: "ClayAccent")
+        addButton.layer.cornerRadius = 27
+        addButton.layer.shadowColor = UIColor.black.cgColor
+        addButton.layer.shadowOpacity = 0.2
+        addButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+        addButton.layer.shadowRadius = 8
+        addButton.addTarget(self, action: #selector(addEventTapped), for: .touchUpInside)
+        addButton.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
+        addButton.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        view.addSubview(addButton)
+
+        NSLayoutConstraint.activate([
+            addButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+            addButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            addButton.widthAnchor.constraint(equalToConstant: 54),
+            addButton.heightAnchor.constraint(equalToConstant: 54),
         ])
     }
 
@@ -154,13 +238,13 @@ class ViewController: UIViewController {
     }
 
     @objc private func islandButtonPressDown(_ sender: UIButton) {
-        UIView.animate(withDuration: 0.1, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
             sender.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
         }
     }
 
     @objc private func islandButtonPressUp(_ sender: UIButton) {
-        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.4, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
+        UIView.animate(withDuration: 0.8, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
             sender.transform = .identity
         }
     }
@@ -169,27 +253,46 @@ class ViewController: UIViewController {
         print("Profile tapped")
     }
 
+    @objc func addEventTapped() {
+        print("Add event tapped")
+    }
+
+    private func switchTo(_ tab: Tab) {
+        guard tab != currentTab else { return }
+        currentTab = tab
+
+        mapView.alpha       = tab == .map   ? 1 : 0
+        statsView.isHidden  = tab != .stats
+        tableView.isHidden  = tab != .home
+        profileButtonView.isHidden = tab != .home
+
+        updateIslandSelection()
+    }
+
     private func updateIslandSelection() {
-        homeButton.setImage(UIImage(named: isMapVisible ? "icon-house"        : "icon-house-filled"), for: .normal)
-        mapButton.setImage(UIImage(named:  isMapVisible ? "icon-map-filled"   : "icon-map"),          for: .normal)
+        homeButton.setImage(UIImage(named: currentTab == .home
+            ? "icon-house-filled" : "icon-house"), for: .normal)
+        statsButton.setImage(UIImage(systemName: currentTab == .stats
+            ? "chart.bar.fill" : "chart.bar"), for: .normal)
+        mapButton.setImage(UIImage(named: currentTab == .map
+            ? "icon-map-filled" : "icon-map"), for: .normal)
+
+        homeButton.alpha  = currentTab == .home  ? 1.0 : 0.4
+        statsButton.alpha = currentTab == .stats ? 1.0 : 0.4
+        mapButton.alpha   = currentTab == .map   ? 1.0 : 0.4
     }
 
-    @objc func homeTapped() {
-        guard isMapVisible else { return }
-        isMapVisible = false
-        mapView.alpha = 0
-        tableView.isHidden = false
-        profileButtonView.isHidden = false
-        updateIslandSelection()
-    }
+    @objc func homeTapped()  { switchTo(.home) }
+    @objc func statsTapped() { switchTo(.stats) }
+    @objc func mapTapped()   { switchTo(.map) }
+}
 
-    @objc func mapTapped() {
-        guard !isMapVisible else { return }
-        isMapVisible = true
-        mapView.alpha = 1
-        tableView.isHidden = true
-        profileButtonView.isHidden = true
-        updateIslandSelection()
+extension ViewController: MKMapViewDelegate {
+    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+        if let tileOverlay = overlay as? MKTileOverlay {
+            return MKTileOverlayRenderer(tileOverlay: tileOverlay)
+        }
+        return MKOverlayRenderer(overlay: overlay)
     }
 }
 
@@ -213,7 +316,7 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 12, weight: .semibold),
+            .font: UIFont.albertSans(.semiBold, size: 12),
             .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
             .kern: 1.5,
         ]

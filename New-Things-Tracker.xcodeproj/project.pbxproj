@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		80AF4D13305AF2F8008EAD01 /* Swift.gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 80AF4D12305AF2F8008EAD01 /* Swift.gitignore */; };
+		80FB3423305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3421305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf */; };
+		80FB3424305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */; };
+		80FB3427305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */; };
+		80FB3428305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +36,10 @@
 		8021E1EC305B0FA600B45986 /* New-Things-TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Things-TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8021E1ED305B0FA600B45986 /* New-Things-TrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Things-TrackerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		80AF4D12305AF2F8008EAD01 /* Swift.gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = Swift.gitignore; sourceTree = "<group>"; };
+		80FB3421305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AlbertSans-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AlbertSans-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ElmsSans-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ElmsSans-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -100,6 +108,10 @@
 				8021E1EB305B0FA600B45986 /* New-Things-Tracker.app */,
 				8021E1EC305B0FA600B45986 /* New-Things-TrackerTests.xctest */,
 				8021E1ED305B0FA600B45986 /* New-Things-TrackerUITests.xctest */,
+				80FB3421305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf */,
+				80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */,
+				80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */,
+				80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */,
 			);
 			sourceTree = "<group>";
 		};
@@ -223,6 +235,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				80FB3427305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf in Resources */,
+				80FB3428305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf in Resources */,
+				80FB3423305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf in Resources */,
+				80FB3424305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf in Resources */,
 				80AF4D13305AF2F8008EAD01 /* Swift.gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
