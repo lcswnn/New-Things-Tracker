@@ -28,9 +28,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		80AF4CDE305AF26F008EAD01 /* New-Things-Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "New-Things-Tracker.app"; path = "/Users/lucaswaunn/projects/New-Things-Tracker/build/Debug-iphoneos/New-Things-Tracker.app"; sourceTree = "<absolute>"; };
-		80AF4CF4305AF270008EAD01 /* New-Things-TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = "New-Things-TrackerTests.xctest"; path = "/Users/lucaswaunn/projects/New-Things-Tracker/build/Debug-iphoneos/New-Things-Tracker.app/PlugIns/New-Things-TrackerTests.xctest"; sourceTree = "<absolute>"; };
-		80AF4CFE305AF270008EAD01 /* New-Things-TrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = "New-Things-TrackerUITests.xctest"; path = "/Users/lucaswaunn/projects/New-Things-Tracker/build/Debug-iphoneos/New-Things-TrackerUITests-Runner.app/PlugIns/New-Things-TrackerUITests.xctest"; sourceTree = "<absolute>"; };
+		8021E1EB305B0FA600B45986 /* New-Things-Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "New-Things-Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8021E1EC305B0FA600B45986 /* New-Things-TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Things-TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8021E1ED305B0FA600B45986 /* New-Things-TrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Things-TrackerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		80AF4D12305AF2F8008EAD01 /* Swift.gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = Swift.gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -97,6 +97,9 @@
 				80AF4CF7305AF270008EAD01 /* New-Things-TrackerTests */,
 				80AF4D01305AF270008EAD01 /* New-Things-TrackerUITests */,
 				80AF4D12305AF2F8008EAD01 /* Swift.gitignore */,
+				8021E1EB305B0FA600B45986 /* New-Things-Tracker.app */,
+				8021E1EC305B0FA600B45986 /* New-Things-TrackerTests.xctest */,
+				8021E1ED305B0FA600B45986 /* New-Things-TrackerUITests.xctest */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,7 +125,7 @@
 			packageProductDependencies = (
 			);
 			productName = "New-Things-Tracker";
-			productReference = 80AF4CDE305AF26F008EAD01 /* New-Things-Tracker.app */;
+			productReference = 8021E1EB305B0FA600B45986 /* New-Things-Tracker.app */;
 			productType = "com.apple.product-type.application";
 		};
 		80AF4CF3305AF270008EAD01 /* New-Things-TrackerTests */ = {
@@ -145,7 +148,7 @@
 			packageProductDependencies = (
 			);
 			productName = "New-Things-TrackerTests";
-			productReference = 80AF4CF4305AF270008EAD01 /* New-Things-TrackerTests.xctest */;
+			productReference = 8021E1EC305B0FA600B45986 /* New-Things-TrackerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		80AF4CFD305AF270008EAD01 /* New-Things-TrackerUITests */ = {
@@ -168,7 +171,7 @@
 			packageProductDependencies = (
 			);
 			productName = "New-Things-TrackerUITests";
-			productReference = 80AF4CFE305AF270008EAD01 /* New-Things-TrackerUITests.xctest */;
+			productReference = 8021E1ED305B0FA600B45986 /* New-Things-TrackerUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
