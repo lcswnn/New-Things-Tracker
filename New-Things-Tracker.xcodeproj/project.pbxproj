@@ -12,6 +12,56 @@
 		80FB3424305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */; };
 		80FB3427305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */; };
 		80FB3428305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */; };
+		80FB3474305B4AD1002EC05F /* Fraunces_72pt-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346E305B4AD1002EC05F /* Fraunces_72pt-Regular.ttf */; };
+		80FB3475305B4AD1002EC05F /* Fraunces_72pt-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346B305B4AD1002EC05F /* Fraunces_72pt-Italic.ttf */; };
+		80FB3476305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3464305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf */; };
+		80FB3477305B4AD1002EC05F /* Fraunces_72pt_Soft-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3456305B4AD1002EC05F /* Fraunces_72pt_Soft-Regular.ttf */; };
+		80FB3478305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3461305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-LightItalic.ttf */; };
+		80FB3479305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345B305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Black.ttf */; };
+		80FB347A305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3460305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Light.ttf */; };
+		80FB347B305B4AD1002EC05F /* Fraunces_72pt_Soft-BlackItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3450305B4AD1002EC05F /* Fraunces_72pt_Soft-BlackItalic.ttf */; };
+		80FB347C305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BlackItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345C305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BlackItalic.ttf */; };
+		80FB347D305B4AD1002EC05F /* Fraunces_72pt_Soft-Thin.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3459305B4AD1002EC05F /* Fraunces_72pt_Soft-Thin.ttf */; };
+		80FB347E305B4AD1002EC05F /* Fraunces_72pt_Soft-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3451305B4AD1002EC05F /* Fraunces_72pt_Soft-Bold.ttf */; };
+		80FB347F305B4AD1002EC05F /* Fraunces_72pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3469305B4AD1002EC05F /* Fraunces_72pt-Bold.ttf */; };
+		80FB3480305B4AD1002EC05F /* Fraunces_72pt-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3467305B4AD1002EC05F /* Fraunces_72pt-Black.ttf */; };
+		80FB3481305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345E305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BoldItalic.ttf */; };
+		80FB3482305B4AD1002EC05F /* Fraunces_72pt_Soft-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3453305B4AD1002EC05F /* Fraunces_72pt_Soft-Italic.ttf */; };
+		80FB3483305B4AD1002EC05F /* Fraunces_72pt-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346A305B4AD1002EC05F /* Fraunces_72pt-BoldItalic.ttf */; };
+		80FB3484305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3462305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Regular.ttf */; };
+		80FB3485305B4AD1002EC05F /* Fraunces_72pt-BlackItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3468305B4AD1002EC05F /* Fraunces_72pt-BlackItalic.ttf */; };
+		80FB3486305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-ThinItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3466305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-ThinItalic.ttf */; };
+		80FB3487305B4AD1002EC05F /* Fraunces_72pt-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3470305B4AD1002EC05F /* Fraunces_72pt-SemiBoldItalic.ttf */; };
+		80FB3488305B4AD1002EC05F /* Fraunces_72pt-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346F305B4AD1002EC05F /* Fraunces_72pt-SemiBold.ttf */; };
+		80FB3489305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3457305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBold.ttf */; };
+		80FB348A305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3458305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBoldItalic.ttf */; };
+		80FB348B305B4AD1002EC05F /* Fraunces_72pt_Soft-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3455305B4AD1002EC05F /* Fraunces_72pt_Soft-LightItalic.ttf */; };
+		80FB348C305B4AD1002EC05F /* Fraunces_72pt-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346C305B4AD1002EC05F /* Fraunces_72pt-Light.ttf */; };
+		80FB348D305B4AD1002EC05F /* Fraunces_72pt_Soft-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB344F305B4AD1002EC05F /* Fraunces_72pt_Soft-Black.ttf */; };
+		80FB348E305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345D305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Bold.ttf */; };
+		80FB348F305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345F305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Italic.ttf */; };
+		80FB3490305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3463305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBold.ttf */; };
+		80FB3491305B4AD1002EC05F /* Fraunces_72pt_Soft-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3452305B4AD1002EC05F /* Fraunces_72pt_Soft-BoldItalic.ttf */; };
+		80FB3492305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Thin.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3465305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Thin.ttf */; };
+		80FB3493305B4AD1002EC05F /* Fraunces_72pt-Thin.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3471305B4AD1002EC05F /* Fraunces_72pt-Thin.ttf */; };
+		80FB3494305B4AD1002EC05F /* Fraunces_72pt_Soft-ThinItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB345A305B4AD1002EC05F /* Fraunces_72pt_Soft-ThinItalic.ttf */; };
+		80FB3495305B4AD1002EC05F /* Fraunces_72pt-ThinItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3472305B4AD1002EC05F /* Fraunces_72pt-ThinItalic.ttf */; };
+		80FB3496305B4AD1002EC05F /* Fraunces_72pt_Soft-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3454305B4AD1002EC05F /* Fraunces_72pt_Soft-Light.ttf */; };
+		80FB3497305B4AD1002EC05F /* Fraunces_72pt-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB346D305B4AD1002EC05F /* Fraunces_72pt-LightItalic.ttf */; };
+		80FB34A7305B4AEE002EC05F /* Karla-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3498305B4AEE002EC05F /* Karla-Bold.ttf */; };
+		80FB34A8305B4AEE002EC05F /* Karla-Light.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349F305B4AEE002EC05F /* Karla-Light.ttf */; };
+		80FB34A9305B4AEE002EC05F /* Karla-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A4305B4AEE002EC05F /* Karla-SemiBold.ttf */; };
+		80FB34AA305B4AEE002EC05F /* Karla-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349A305B4AEE002EC05F /* Karla-ExtraBold.ttf */; };
+		80FB34AB305B4AEE002EC05F /* Karla-ExtraBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349B305B4AEE002EC05F /* Karla-ExtraBoldItalic.ttf */; };
+		80FB34AC305B4AEE002EC05F /* Karla-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A2305B4AEE002EC05F /* Karla-MediumItalic.ttf */; };
+		80FB34AD305B4AEE002EC05F /* Karla-ExtraLightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349D305B4AEE002EC05F /* Karla-ExtraLightItalic.ttf */; };
+		80FB34AE305B4AEE002EC05F /* Karla-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB3499305B4AEE002EC05F /* Karla-BoldItalic.ttf */; };
+		80FB34AF305B4AEE002EC05F /* Karla-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A3305B4AEE002EC05F /* Karla-Regular.ttf */; };
+		80FB34B0305B4AEE002EC05F /* Karla-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A5305B4AEE002EC05F /* Karla-SemiBoldItalic.ttf */; };
+		80FB34B1305B4AEE002EC05F /* Karla-ExtraLight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349C305B4AEE002EC05F /* Karla-ExtraLight.ttf */; };
+		80FB34B2305B4AEE002EC05F /* Karla-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A0305B4AEE002EC05F /* Karla-LightItalic.ttf */; };
+		80FB34B3305B4AEE002EC05F /* Karla-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB34A1305B4AEE002EC05F /* Karla-Medium.ttf */; };
+		80FB34B4305B4AEE002EC05F /* Karla-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 80FB349E305B4AEE002EC05F /* Karla-Italic.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +90,56 @@
 		80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AlbertSans-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ElmsSans-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ElmsSans-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		80FB344F305B4AD1002EC05F /* Fraunces_72pt_Soft-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Black.ttf"; sourceTree = "<group>"; };
+		80FB3450305B4AD1002EC05F /* Fraunces_72pt_Soft-BlackItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-BlackItalic.ttf"; sourceTree = "<group>"; };
+		80FB3451305B4AD1002EC05F /* Fraunces_72pt_Soft-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Bold.ttf"; sourceTree = "<group>"; };
+		80FB3452305B4AD1002EC05F /* Fraunces_72pt_Soft-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-BoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB3453305B4AD1002EC05F /* Fraunces_72pt_Soft-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Italic.ttf"; sourceTree = "<group>"; };
+		80FB3454305B4AD1002EC05F /* Fraunces_72pt_Soft-Light.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Light.ttf"; sourceTree = "<group>"; };
+		80FB3455305B4AD1002EC05F /* Fraunces_72pt_Soft-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-LightItalic.ttf"; sourceTree = "<group>"; };
+		80FB3456305B4AD1002EC05F /* Fraunces_72pt_Soft-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Regular.ttf"; sourceTree = "<group>"; };
+		80FB3457305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-SemiBold.ttf"; sourceTree = "<group>"; };
+		80FB3458305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB3459305B4AD1002EC05F /* Fraunces_72pt_Soft-Thin.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-Thin.ttf"; sourceTree = "<group>"; };
+		80FB345A305B4AD1002EC05F /* Fraunces_72pt_Soft-ThinItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_Soft-ThinItalic.ttf"; sourceTree = "<group>"; };
+		80FB345B305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Black.ttf"; sourceTree = "<group>"; };
+		80FB345C305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BlackItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-BlackItalic.ttf"; sourceTree = "<group>"; };
+		80FB345D305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Bold.ttf"; sourceTree = "<group>"; };
+		80FB345E305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-BoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB345F305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Italic.ttf"; sourceTree = "<group>"; };
+		80FB3460305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Light.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Light.ttf"; sourceTree = "<group>"; };
+		80FB3461305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-LightItalic.ttf"; sourceTree = "<group>"; };
+		80FB3462305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Regular.ttf"; sourceTree = "<group>"; };
+		80FB3463305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-SemiBold.ttf"; sourceTree = "<group>"; };
+		80FB3464305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB3465305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Thin.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-Thin.ttf"; sourceTree = "<group>"; };
+		80FB3466305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-ThinItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt_SuperSoft-ThinItalic.ttf"; sourceTree = "<group>"; };
+		80FB3467305B4AD1002EC05F /* Fraunces_72pt-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Black.ttf"; sourceTree = "<group>"; };
+		80FB3468305B4AD1002EC05F /* Fraunces_72pt-BlackItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-BlackItalic.ttf"; sourceTree = "<group>"; };
+		80FB3469305B4AD1002EC05F /* Fraunces_72pt-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Bold.ttf"; sourceTree = "<group>"; };
+		80FB346A305B4AD1002EC05F /* Fraunces_72pt-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-BoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB346B305B4AD1002EC05F /* Fraunces_72pt-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Italic.ttf"; sourceTree = "<group>"; };
+		80FB346C305B4AD1002EC05F /* Fraunces_72pt-Light.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Light.ttf"; sourceTree = "<group>"; };
+		80FB346D305B4AD1002EC05F /* Fraunces_72pt-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-LightItalic.ttf"; sourceTree = "<group>"; };
+		80FB346E305B4AD1002EC05F /* Fraunces_72pt-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Regular.ttf"; sourceTree = "<group>"; };
+		80FB346F305B4AD1002EC05F /* Fraunces_72pt-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-SemiBold.ttf"; sourceTree = "<group>"; };
+		80FB3470305B4AD1002EC05F /* Fraunces_72pt-SemiBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB3471305B4AD1002EC05F /* Fraunces_72pt-Thin.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-Thin.ttf"; sourceTree = "<group>"; };
+		80FB3472305B4AD1002EC05F /* Fraunces_72pt-ThinItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces_72pt-ThinItalic.ttf"; sourceTree = "<group>"; };
+		80FB3498305B4AEE002EC05F /* Karla-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-Bold.ttf"; sourceTree = "<group>"; };
+		80FB3499305B4AEE002EC05F /* Karla-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-BoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB349A305B4AEE002EC05F /* Karla-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-ExtraBold.ttf"; sourceTree = "<group>"; };
+		80FB349B305B4AEE002EC05F /* Karla-ExtraBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-ExtraBoldItalic.ttf"; sourceTree = "<group>"; };
+		80FB349C305B4AEE002EC05F /* Karla-ExtraLight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-ExtraLight.ttf"; sourceTree = "<group>"; };
+		80FB349D305B4AEE002EC05F /* Karla-ExtraLightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-ExtraLightItalic.ttf"; sourceTree = "<group>"; };
+		80FB349E305B4AEE002EC05F /* Karla-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-Italic.ttf"; sourceTree = "<group>"; };
+		80FB349F305B4AEE002EC05F /* Karla-Light.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-Light.ttf"; sourceTree = "<group>"; };
+		80FB34A0305B4AEE002EC05F /* Karla-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-LightItalic.ttf"; sourceTree = "<group>"; };
+		80FB34A1305B4AEE002EC05F /* Karla-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-Medium.ttf"; sourceTree = "<group>"; };
+		80FB34A2305B4AEE002EC05F /* Karla-MediumItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-MediumItalic.ttf"; sourceTree = "<group>"; };
+		80FB34A3305B4AEE002EC05F /* Karla-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-Regular.ttf"; sourceTree = "<group>"; };
+		80FB34A4305B4AEE002EC05F /* Karla-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-SemiBold.ttf"; sourceTree = "<group>"; };
+		80FB34A5305B4AEE002EC05F /* Karla-SemiBoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Karla-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -112,7 +212,73 @@
 				80FB3422305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf */,
 				80FB3425305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf */,
 				80FB3426305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf */,
+				80FB34A6305B4AEE002EC05F /* Karla_static */,
+				80FB3473305B4AD1002EC05F /* Fraunces_static */,
 			);
+			sourceTree = "<group>";
+		};
+		80FB3473305B4AD1002EC05F /* Fraunces_static */ = {
+			isa = PBXGroup;
+			children = (
+				80FB344F305B4AD1002EC05F /* Fraunces_72pt_Soft-Black.ttf */,
+				80FB3450305B4AD1002EC05F /* Fraunces_72pt_Soft-BlackItalic.ttf */,
+				80FB3451305B4AD1002EC05F /* Fraunces_72pt_Soft-Bold.ttf */,
+				80FB3452305B4AD1002EC05F /* Fraunces_72pt_Soft-BoldItalic.ttf */,
+				80FB3453305B4AD1002EC05F /* Fraunces_72pt_Soft-Italic.ttf */,
+				80FB3454305B4AD1002EC05F /* Fraunces_72pt_Soft-Light.ttf */,
+				80FB3455305B4AD1002EC05F /* Fraunces_72pt_Soft-LightItalic.ttf */,
+				80FB3456305B4AD1002EC05F /* Fraunces_72pt_Soft-Regular.ttf */,
+				80FB3457305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBold.ttf */,
+				80FB3458305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBoldItalic.ttf */,
+				80FB3459305B4AD1002EC05F /* Fraunces_72pt_Soft-Thin.ttf */,
+				80FB345A305B4AD1002EC05F /* Fraunces_72pt_Soft-ThinItalic.ttf */,
+				80FB345B305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Black.ttf */,
+				80FB345C305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BlackItalic.ttf */,
+				80FB345D305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Bold.ttf */,
+				80FB345E305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BoldItalic.ttf */,
+				80FB345F305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Italic.ttf */,
+				80FB3460305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Light.ttf */,
+				80FB3461305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-LightItalic.ttf */,
+				80FB3462305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Regular.ttf */,
+				80FB3463305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBold.ttf */,
+				80FB3464305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf */,
+				80FB3465305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Thin.ttf */,
+				80FB3466305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-ThinItalic.ttf */,
+				80FB3467305B4AD1002EC05F /* Fraunces_72pt-Black.ttf */,
+				80FB3468305B4AD1002EC05F /* Fraunces_72pt-BlackItalic.ttf */,
+				80FB3469305B4AD1002EC05F /* Fraunces_72pt-Bold.ttf */,
+				80FB346A305B4AD1002EC05F /* Fraunces_72pt-BoldItalic.ttf */,
+				80FB346B305B4AD1002EC05F /* Fraunces_72pt-Italic.ttf */,
+				80FB346C305B4AD1002EC05F /* Fraunces_72pt-Light.ttf */,
+				80FB346D305B4AD1002EC05F /* Fraunces_72pt-LightItalic.ttf */,
+				80FB346E305B4AD1002EC05F /* Fraunces_72pt-Regular.ttf */,
+				80FB346F305B4AD1002EC05F /* Fraunces_72pt-SemiBold.ttf */,
+				80FB3470305B4AD1002EC05F /* Fraunces_72pt-SemiBoldItalic.ttf */,
+				80FB3471305B4AD1002EC05F /* Fraunces_72pt-Thin.ttf */,
+				80FB3472305B4AD1002EC05F /* Fraunces_72pt-ThinItalic.ttf */,
+			);
+			path = Fraunces_static;
+			sourceTree = "<group>";
+		};
+		80FB34A6305B4AEE002EC05F /* Karla_static */ = {
+			isa = PBXGroup;
+			children = (
+				80FB3498305B4AEE002EC05F /* Karla-Bold.ttf */,
+				80FB3499305B4AEE002EC05F /* Karla-BoldItalic.ttf */,
+				80FB349A305B4AEE002EC05F /* Karla-ExtraBold.ttf */,
+				80FB349B305B4AEE002EC05F /* Karla-ExtraBoldItalic.ttf */,
+				80FB349C305B4AEE002EC05F /* Karla-ExtraLight.ttf */,
+				80FB349D305B4AEE002EC05F /* Karla-ExtraLightItalic.ttf */,
+				80FB349E305B4AEE002EC05F /* Karla-Italic.ttf */,
+				80FB349F305B4AEE002EC05F /* Karla-Light.ttf */,
+				80FB34A0305B4AEE002EC05F /* Karla-LightItalic.ttf */,
+				80FB34A1305B4AEE002EC05F /* Karla-Medium.ttf */,
+				80FB34A2305B4AEE002EC05F /* Karla-MediumItalic.ttf */,
+				80FB34A3305B4AEE002EC05F /* Karla-Regular.ttf */,
+				80FB34A4305B4AEE002EC05F /* Karla-SemiBold.ttf */,
+				80FB34A5305B4AEE002EC05F /* Karla-SemiBoldItalic.ttf */,
+			);
+			path = Karla_static;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -237,6 +403,56 @@
 			files = (
 				80FB3427305B32A4002EC05F /* ElmsSans-VariableFont_wght.ttf in Resources */,
 				80FB3428305B32A4002EC05F /* ElmsSans-Italic-VariableFont_wght.ttf in Resources */,
+				80FB3474305B4AD1002EC05F /* Fraunces_72pt-Regular.ttf in Resources */,
+				80FB3475305B4AD1002EC05F /* Fraunces_72pt-Italic.ttf in Resources */,
+				80FB3476305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBoldItalic.ttf in Resources */,
+				80FB3477305B4AD1002EC05F /* Fraunces_72pt_Soft-Regular.ttf in Resources */,
+				80FB3478305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-LightItalic.ttf in Resources */,
+				80FB3479305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Black.ttf in Resources */,
+				80FB347A305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Light.ttf in Resources */,
+				80FB34A7305B4AEE002EC05F /* Karla-Bold.ttf in Resources */,
+				80FB34A8305B4AEE002EC05F /* Karla-Light.ttf in Resources */,
+				80FB34A9305B4AEE002EC05F /* Karla-SemiBold.ttf in Resources */,
+				80FB34AA305B4AEE002EC05F /* Karla-ExtraBold.ttf in Resources */,
+				80FB34AB305B4AEE002EC05F /* Karla-ExtraBoldItalic.ttf in Resources */,
+				80FB34AC305B4AEE002EC05F /* Karla-MediumItalic.ttf in Resources */,
+				80FB34AD305B4AEE002EC05F /* Karla-ExtraLightItalic.ttf in Resources */,
+				80FB34AE305B4AEE002EC05F /* Karla-BoldItalic.ttf in Resources */,
+				80FB34AF305B4AEE002EC05F /* Karla-Regular.ttf in Resources */,
+				80FB34B0305B4AEE002EC05F /* Karla-SemiBoldItalic.ttf in Resources */,
+				80FB34B1305B4AEE002EC05F /* Karla-ExtraLight.ttf in Resources */,
+				80FB34B2305B4AEE002EC05F /* Karla-LightItalic.ttf in Resources */,
+				80FB34B3305B4AEE002EC05F /* Karla-Medium.ttf in Resources */,
+				80FB34B4305B4AEE002EC05F /* Karla-Italic.ttf in Resources */,
+				80FB347B305B4AD1002EC05F /* Fraunces_72pt_Soft-BlackItalic.ttf in Resources */,
+				80FB347C305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BlackItalic.ttf in Resources */,
+				80FB347D305B4AD1002EC05F /* Fraunces_72pt_Soft-Thin.ttf in Resources */,
+				80FB347E305B4AD1002EC05F /* Fraunces_72pt_Soft-Bold.ttf in Resources */,
+				80FB347F305B4AD1002EC05F /* Fraunces_72pt-Bold.ttf in Resources */,
+				80FB3480305B4AD1002EC05F /* Fraunces_72pt-Black.ttf in Resources */,
+				80FB3481305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-BoldItalic.ttf in Resources */,
+				80FB3482305B4AD1002EC05F /* Fraunces_72pt_Soft-Italic.ttf in Resources */,
+				80FB3483305B4AD1002EC05F /* Fraunces_72pt-BoldItalic.ttf in Resources */,
+				80FB3484305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Regular.ttf in Resources */,
+				80FB3485305B4AD1002EC05F /* Fraunces_72pt-BlackItalic.ttf in Resources */,
+				80FB3486305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-ThinItalic.ttf in Resources */,
+				80FB3487305B4AD1002EC05F /* Fraunces_72pt-SemiBoldItalic.ttf in Resources */,
+				80FB3488305B4AD1002EC05F /* Fraunces_72pt-SemiBold.ttf in Resources */,
+				80FB3489305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBold.ttf in Resources */,
+				80FB348A305B4AD1002EC05F /* Fraunces_72pt_Soft-SemiBoldItalic.ttf in Resources */,
+				80FB348B305B4AD1002EC05F /* Fraunces_72pt_Soft-LightItalic.ttf in Resources */,
+				80FB348C305B4AD1002EC05F /* Fraunces_72pt-Light.ttf in Resources */,
+				80FB348D305B4AD1002EC05F /* Fraunces_72pt_Soft-Black.ttf in Resources */,
+				80FB348E305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Bold.ttf in Resources */,
+				80FB348F305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Italic.ttf in Resources */,
+				80FB3490305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-SemiBold.ttf in Resources */,
+				80FB3491305B4AD1002EC05F /* Fraunces_72pt_Soft-BoldItalic.ttf in Resources */,
+				80FB3492305B4AD1002EC05F /* Fraunces_72pt_SuperSoft-Thin.ttf in Resources */,
+				80FB3493305B4AD1002EC05F /* Fraunces_72pt-Thin.ttf in Resources */,
+				80FB3494305B4AD1002EC05F /* Fraunces_72pt_Soft-ThinItalic.ttf in Resources */,
+				80FB3495305B4AD1002EC05F /* Fraunces_72pt-ThinItalic.ttf in Resources */,
+				80FB3496305B4AD1002EC05F /* Fraunces_72pt_Soft-Light.ttf in Resources */,
+				80FB3497305B4AD1002EC05F /* Fraunces_72pt-LightItalic.ttf in Resources */,
 				80FB3423305B3290002EC05F /* AlbertSans-Italic-VariableFont_wght.ttf in Resources */,
 				80FB3424305B3290002EC05F /* AlbertSans-VariableFont_wght.ttf in Resources */,
 				80AF4D13305AF2F8008EAD01 /* Swift.gitignore in Resources */,

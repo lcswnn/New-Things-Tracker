@@ -1,24 +1,27 @@
 import UIKit
 
 extension UIFont {
-    static func albertSans(_ weight: AlbertSansWeight, size: CGFloat) -> UIFont {
-        let descriptor = UIFontDescriptor(fontAttributes: [
-            .family: "Albert Sans",
-            .traits: [UIFontDescriptor.TraitKey.weight: weight.uiWeight]
-        ])
-        return UIFont(descriptor: descriptor, size: size)
+    // Fraunces — serif display font for titles and headers
+    static func fraunces(_ weight: UIFont.Weight = .regular, size: CGFloat) -> UIFont {
+        let name: String
+        switch weight {
+        case .semibold:                         name = "Fraunces72pt-SemiBold"
+        case .bold, .heavy, .black:             name = "Fraunces72pt-Bold"
+        default:                                name = "Fraunces72pt-Regular"
+        }
+        return UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
     }
 
-    enum AlbertSansWeight {
-        case regular, medium, semiBold, bold
-        var uiWeight: UIFont.Weight {
-            switch self {
-            case .regular:  return .regular
-            case .medium:   return .medium
-            case .semiBold: return .semibold
-            case .bold:     return .bold
-            }
+    // Karla — sans-serif for body text, labels, and subtitles
+    static func karla(_ weight: UIFont.Weight = .regular, size: CGFloat) -> UIFont {
+        let name: String
+        switch weight {
+        case .medium:                           name = "Karla-Medium"
+        case .semibold:                         name = "Karla-SemiBold"
+        case .bold, .heavy, .black:             name = "Karla-Bold"
+        default:                                name = "Karla-Regular"
         }
+        return UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
     }
 }
 
@@ -87,7 +90,7 @@ class FirstCardCell: UITableViewCell {
 
         largePhotoLabel.translatesAutoresizingMaskIntoConstraints = false
         largePhotoLabel.text = "PHOTO"
-        largePhotoLabel.font = UIFont.albertSans(.medium, size: 12)
+        largePhotoLabel.font = UIFont.karla(.medium, size: 12)
         largePhotoLabel.textColor = UIColor.black.withAlphaComponent(0.25)
         largePhotoLabel.textAlignment = .center
         largePhotoView.addSubview(largePhotoLabel)
@@ -101,7 +104,7 @@ class FirstCardCell: UITableViewCell {
 
         smallPhotoLabel.translatesAutoresizingMaskIntoConstraints = false
         smallPhotoLabel.text = "PHOTO"
-        smallPhotoLabel.font = UIFont.albertSans(.medium, size: 10)
+        smallPhotoLabel.font = UIFont.karla(.medium, size: 10)
         smallPhotoLabel.textColor = UIColor.black.withAlphaComponent(0.25)
         smallPhotoLabel.textAlignment = .center
         smallPhotoView.addSubview(smallPhotoLabel)
@@ -111,7 +114,7 @@ class FirstCardCell: UITableViewCell {
         rightColumn.addSubview(extraCountContainer)
 
         extraCountLabel.translatesAutoresizingMaskIntoConstraints = false
-        extraCountLabel.font = UIFont.albertSans(.medium, size: 17)
+        extraCountLabel.font = UIFont.karla(.medium, size: 17)
         extraCountLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.55)
         extraCountLabel.textAlignment = .center
         extraCountContainer.addSubview(extraCountLabel)
@@ -127,23 +130,23 @@ class FirstCardCell: UITableViewCell {
         infoSection.addSubview(categoryContainer)
 
         categoryLabel.translatesAutoresizingMaskIntoConstraints = false
-        categoryLabel.font = UIFont.albertSans(.semiBold, size: 13)
+        categoryLabel.font = UIFont.karla(.semibold, size: 13)
         categoryLabel.textColor = UIColor(named: "DeepPineInk")
         categoryContainer.addSubview(categoryLabel)
 
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
-        dateLabel.font = UIFont.albertSans(.regular, size: 14)
+        dateLabel.font = UIFont.karla(.regular, size: 14)
         dateLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.55)
         infoSection.addSubview(dateLabel)
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = UIFont.albertSans(.bold, size: 22)
+        titleLabel.font = UIFont.fraunces(.bold, size: 22)
         titleLabel.textColor = UIColor(named: "DeepPineInk")
         titleLabel.numberOfLines = 2
         infoSection.addSubview(titleLabel)
 
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.font = UIFont.albertSans(.regular, size: 14)
+        subtitleLabel.font = UIFont.karla(.regular, size: 14)
         subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.45)
         infoSection.addSubview(subtitleLabel)
 

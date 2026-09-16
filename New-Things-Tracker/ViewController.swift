@@ -17,18 +17,26 @@ private class EsriLightGrayTileOverlay: MKTileOverlay {
 
 class ViewController: UIViewController {
 
-    private enum Tab { case home, stats, map }
+    private enum Tab { case home, discover, stats, map }
     private var currentTab: Tab = .home
 
     private var profileButtonView: UIButton!
     private var mapView: MKMapView!
     private var statsView: UIView!
+    private var discoverView: UIView!
     private var islandBar: UIView!
     private var tableView: UITableView!
     private var homeButton: UIButton!
+    private var discoverButton: UIButton!
     private var statsButton: UIButton!
     private var mapButton: UIButton!
     private var addButton: UIButton!
+    private var addButtonContainer: UIView!
+    private var greetingLabel: UILabel!
+    private var dateLabel: UILabel!
+    private var esriLabel: UILabel!
+    private weak var headerFadeView: UIView?
+    private let headerFadeLayer = CAGradientLayer()
 
     private let sections: [(month: String, firsts: [First])] = [
         ("SEPTEMBER", [
@@ -60,10 +68,20 @@ class ViewController: UIViewController {
 
         setupMapView()
         setupStatsView()
+        setupDiscoverView()
         setupProfileButton()
+        setupHeaderLabels()
         setupIslandBar()
         setupAddButton()
         setupCardsTable()
+        setupHeaderFade()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if let fadeView = headerFadeView {
+            headerFadeLayer.frame = fadeView.bounds
+        }
     }
 
     private func setupMapView() {
@@ -81,11 +99,12 @@ class ViewController: UIViewController {
 
         view.addSubview(mapView)
 
-        let esriLabel = UILabel()
+        esriLabel = UILabel()
         esriLabel.translatesAutoresizingMaskIntoConstraints = false
         esriLabel.text = "Powered by Esri"
-        esriLabel.font = UIFont.albertSans(.regular, size: 10)
+        esriLabel.font = UIFont.karla(.regular, size: 10)
         esriLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.4)
+        esriLabel.isHidden = true
         view.addSubview(esriLabel)
 
         NSLayoutConstraint.activate([
@@ -96,6 +115,23 @@ class ViewController: UIViewController {
 
             esriLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             esriLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -26),
+        ])
+    }
+
+    private func setupDiscoverView() {
+        let discoverVC = DiscoverViewController()
+        addChild(discoverVC)
+        discoverView = discoverVC.view
+        discoverView.translatesAutoresizingMaskIntoConstraints = false
+        discoverView.isHidden = true
+        view.addSubview(discoverView)
+        discoverVC.didMove(toParent: self)
+
+        NSLayoutConstraint.activate([
+            discoverView.topAnchor.constraint(equalTo: view.topAnchor),
+            discoverView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            discoverView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            discoverView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
     }
 
@@ -119,9 +155,10 @@ class ViewController: UIViewController {
     private func setupProfileButton() {
         profileButtonView = UIButton(type: .system)
         profileButtonView.translatesAutoresizingMaskIntoConstraints = false
-        profileButtonView.setImage(UIImage(systemName: "person.fill"), for: .normal)
-        profileButtonView.tintColor = UIColor(named: "DeepPineInk")
-        profileButtonView.backgroundColor = UIColor(named: "FogBackground")
+        profileButtonView.setImage(UIImage(named: "icon-account"), for: .normal)
+        profileButtonView.imageEdgeInsets = UIEdgeInsets(top: 11, left: 11, bottom: 11, right: 11)
+        profileButtonView.tintColor = UIColor(named: "FogBackground")
+        profileButtonView.backgroundColor = UIColor(named: "DeepPineInk")
         profileButtonView.layer.cornerRadius = 20
         profileButtonView.layer.shadowColor = UIColor.black.cgColor
         profileButtonView.layer.shadowOpacity = 0.15
@@ -140,6 +177,46 @@ class ViewController: UIViewController {
         ])
     }
 
+    private func setupHeaderLabels() {
+        greetingLabel = UILabel()
+        greetingLabel.translatesAutoresizingMaskIntoConstraints = false
+        greetingLabel.text = currentGreeting()
+        greetingLabel.font = UIFont.fraunces(.bold, size: 26)
+        greetingLabel.textColor = UIColor(named: "FogBackground")
+        view.addSubview(greetingLabel)
+
+        dateLabel = UILabel()
+        dateLabel.translatesAutoresizingMaskIntoConstraints = false
+        dateLabel.text = formattedToday()
+        dateLabel.font = UIFont.karla(.regular, size: 14)
+        dateLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.65)
+        view.addSubview(dateLabel)
+
+        NSLayoutConstraint.activate([
+            greetingLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
+            greetingLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            greetingLabel.trailingAnchor.constraint(equalTo: profileButtonView.leadingAnchor, constant: -12),
+
+            dateLabel.topAnchor.constraint(equalTo: greetingLabel.bottomAnchor, constant: 3),
+            dateLabel.leadingAnchor.constraint(equalTo: greetingLabel.leadingAnchor),
+        ])
+    }
+
+    private func currentGreeting() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 0..<12: return "Good morning."
+        case 12..<17: return "Good afternoon."
+        default:      return "Good evening."
+        }
+    }
+
+    private func formattedToday() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
+    }
+
     private func setupCardsTable() {
         tableView = UITableView(frame: .zero, style: .grouped)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -152,77 +229,119 @@ class ViewController: UIViewController {
         view.insertSubview(tableView, belowSubview: islandBar)
 
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: profileButtonView.bottomAnchor, constant: 8),
+            tableView.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 8),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }
 
+    private func setupHeaderFade() {
+        let fadeView = UIView()
+        fadeView.translatesAutoresizingMaskIntoConstraints = false
+        fadeView.isUserInteractionEnabled = false
+        headerFadeView = fadeView
+        view.insertSubview(fadeView, aboveSubview: tableView)
+
+        let bg = UIColor(named: "DustySage") ?? UIColor(red: 0.70, green: 0.75, blue: 0.68, alpha: 1)
+        headerFadeLayer.colors = [bg.cgColor, bg.withAlphaComponent(0).cgColor]
+        headerFadeLayer.locations = [0.0, 1.0]
+        fadeView.layer.addSublayer(headerFadeLayer)
+
+        NSLayoutConstraint.activate([
+            fadeView.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 8),
+            fadeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            fadeView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            fadeView.heightAnchor.constraint(equalToConstant: 48),
+        ])
+    }
+
     private func setupIslandBar() {
         islandBar = UIView()
         islandBar.translatesAutoresizingMaskIntoConstraints = false
-        islandBar.backgroundColor = UIColor(named: "DeepPineInk")
+        islandBar.backgroundColor = .clear
         islandBar.layer.cornerRadius = 30
         islandBar.layer.shadowColor = UIColor.black.cgColor
-        islandBar.layer.shadowOpacity = 0.2
+        islandBar.layer.shadowOpacity = 0.25
         islandBar.layer.shadowOffset = CGSize(width: 0, height: 4)
         islandBar.layer.shadowRadius = 12
+        islandBar.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 290, height: 60), cornerRadius: 30).cgPath
         view.addSubview(islandBar)
+        insertFrostBackground(into: islandBar, cornerRadius: 30, tintColor: UIColor(named: "DeepPineInk") ?? .black, tintAlpha: 0.55)
 
         NSLayoutConstraint.activate([
             islandBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
-            islandBar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            islandBar.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: -33),
             islandBar.heightAnchor.constraint(equalToConstant: 60),
-            islandBar.widthAnchor.constraint(equalToConstant: 230),
+            islandBar.widthAnchor.constraint(equalToConstant: 290),
         ])
 
-        homeButton  = makeIslandButton(image: UIImage(named: "icon-house"),         action: #selector(homeTapped))
-        statsButton = makeIslandButton(image: UIImage(systemName: "chart.bar.fill"), action: #selector(statsTapped))
-        mapButton   = makeIslandButton(image: UIImage(named: "icon-map"),            action: #selector(mapTapped))
+        homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
+        discoverButton = makeIslandButton(image: UIImage(named: "icon-navigate"), action: #selector(discoverTapped))
+        statsButton    = makeIslandButton(image: UIImage(named: "icon-chart"),    action: #selector(statsTapped))
+        mapButton      = makeIslandButton(image: UIImage(named: "icon-map"),      action: #selector(mapTapped))
 
-        islandBar.addSubview(homeButton)
-        islandBar.addSubview(statsButton)
-        islandBar.addSubview(mapButton)
+        // Force the discover icon to render at an explicit size so it matches the others
+        discoverButton.contentHorizontalAlignment = .fill
+        discoverButton.contentVerticalAlignment = .fill
+        discoverButton.imageView?.contentMode = .scaleAspectFit
+        NSLayoutConstraint.activate([
+            discoverButton.widthAnchor.constraint(equalToConstant: 29),
+            discoverButton.heightAnchor.constraint(equalToConstant: 29),
+        ])
+
+        let stack = UIStackView(arrangedSubviews: [homeButton, discoverButton, statsButton, mapButton])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.distribution = .equalSpacing
+        stack.alignment = .center
+        islandBar.addSubview(stack)
 
         updateIslandSelection()
 
         NSLayoutConstraint.activate([
-            homeButton.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor, constant: 28),
-            homeButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
-
-            statsButton.centerXAnchor.constraint(equalTo: islandBar.centerXAnchor),
-            statsButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
-
-            mapButton.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: -28),
-            mapButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
         ])
     }
 
     private func setupAddButton() {
+        // Container holds the shadow + frost so the UIButton inside stays untouched
+        addButtonContainer = UIView()
+        addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
+        addButtonContainer.backgroundColor = .clear
+        addButtonContainer.layer.cornerRadius = 27
+        addButtonContainer.layer.shadowColor = UIColor.black.cgColor
+        addButtonContainer.layer.shadowOpacity = 0.25
+        addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
+        addButtonContainer.layer.shadowRadius = 8
+        addButtonContainer.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 54, height: 54), cornerRadius: 27).cgPath
+        insertFrostBackground(into: addButtonContainer, cornerRadius: 27, tintColor: UIColor(named: "ClayAccent") ?? .orange, tintAlpha: 0.65)
+        view.addSubview(addButtonContainer)
+
+        // Button sits on top of the frost view as a sibling — never inside UIVisualEffectView
         addButton = UIButton(type: .system)
         addButton.translatesAutoresizingMaskIntoConstraints = false
-
-        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
-        addButton.setImage(UIImage(systemName: "plus", withConfiguration: config), for: .normal)
+        let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 32, weight: .medium))
+        addButton.setImage(plusImage, for: .normal)
         addButton.tintColor = UIColor(named: "FogBackground")
-        addButton.backgroundColor = UIColor(named: "ClayAccent")
-        addButton.layer.cornerRadius = 27
-        addButton.layer.shadowColor = UIColor.black.cgColor
-        addButton.layer.shadowOpacity = 0.2
-        addButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        addButton.layer.shadowRadius = 8
+        addButton.backgroundColor = .clear
         addButton.addTarget(self, action: #selector(addEventTapped), for: .touchUpInside)
         addButton.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
         addButton.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-
-        view.addSubview(addButton)
+        addButtonContainer.addSubview(addButton)
 
         NSLayoutConstraint.activate([
-            addButton.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
-            addButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            addButton.widthAnchor.constraint(equalToConstant: 54),
-            addButton.heightAnchor.constraint(equalToConstant: 54),
+            addButtonContainer.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+            addButtonContainer.leadingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: 12),
+            addButtonContainer.widthAnchor.constraint(equalToConstant: 54),
+            addButtonContainer.heightAnchor.constraint(equalToConstant: 54),
+
+            addButton.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
+            addButton.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
+            addButton.leadingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor),
+            addButton.trailingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor),
         ])
     }
 
@@ -237,15 +356,43 @@ class ViewController: UIViewController {
         return button
     }
 
+    private func insertFrostBackground(into view: UIView, cornerRadius: CGFloat, tintColor: UIColor, tintAlpha: CGFloat) {
+        let frostView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        frostView.translatesAutoresizingMaskIntoConstraints = false
+        frostView.layer.cornerRadius = cornerRadius
+        frostView.clipsToBounds = true
+
+        let tint = UIView()
+        tint.translatesAutoresizingMaskIntoConstraints = false
+        tint.backgroundColor = tintColor.withAlphaComponent(tintAlpha)
+        frostView.contentView.addSubview(tint)
+        NSLayoutConstraint.activate([
+            tint.topAnchor.constraint(equalTo: frostView.contentView.topAnchor),
+            tint.bottomAnchor.constraint(equalTo: frostView.contentView.bottomAnchor),
+            tint.leadingAnchor.constraint(equalTo: frostView.contentView.leadingAnchor),
+            tint.trailingAnchor.constraint(equalTo: frostView.contentView.trailingAnchor),
+        ])
+
+        view.insertSubview(frostView, at: 0)
+        NSLayoutConstraint.activate([
+            frostView.topAnchor.constraint(equalTo: view.topAnchor),
+            frostView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            frostView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            frostView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+    }
+
     @objc private func islandButtonPressDown(_ sender: UIButton) {
+        let target: UIView = (sender == addButton) ? addButtonContainer : sender
         UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
-            sender.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
+            target.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
         }
     }
 
     @objc private func islandButtonPressUp(_ sender: UIButton) {
+        let target: UIView = (sender == addButton) ? addButtonContainer : sender
         UIView.animate(withDuration: 0.8, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
-            sender.transform = .identity
+            target.transform = .identity
         }
     }
 
@@ -261,10 +408,15 @@ class ViewController: UIViewController {
         guard tab != currentTab else { return }
         currentTab = tab
 
-        mapView.alpha       = tab == .map   ? 1 : 0
-        statsView.isHidden  = tab != .stats
-        tableView.isHidden  = tab != .home
+        mapView.alpha              = tab == .map      ? 1 : 0
+        statsView.isHidden         = tab != .stats
+        discoverView.isHidden      = tab != .discover
+        tableView.isHidden         = tab != .home
         profileButtonView.isHidden = tab != .home
+        greetingLabel.isHidden     = tab != .home
+        dateLabel.isHidden         = tab != .home
+        esriLabel.isHidden         = tab != .map
+        headerFadeView?.isHidden   = tab != .home
 
         updateIslandSelection()
     }
@@ -272,19 +424,23 @@ class ViewController: UIViewController {
     private func updateIslandSelection() {
         homeButton.setImage(UIImage(named: currentTab == .home
             ? "icon-house-filled" : "icon-house"), for: .normal)
-        statsButton.setImage(UIImage(systemName: currentTab == .stats
-            ? "chart.bar.fill" : "chart.bar"), for: .normal)
+        discoverButton.setImage(UIImage(named: currentTab == .discover
+            ? "icon-navigate-filled" : "icon-navigate"), for: .normal)
+        statsButton.setImage(UIImage(named: currentTab == .stats
+            ? "icon-chart-filled" : "icon-chart"), for: .normal)
         mapButton.setImage(UIImage(named: currentTab == .map
             ? "icon-map-filled" : "icon-map"), for: .normal)
 
-        homeButton.alpha  = currentTab == .home  ? 1.0 : 0.4
-        statsButton.alpha = currentTab == .stats ? 1.0 : 0.4
-        mapButton.alpha   = currentTab == .map   ? 1.0 : 0.4
+        homeButton.alpha     = currentTab == .home     ? 1.0 : 0.4
+        discoverButton.alpha = currentTab == .discover ? 1.0 : 0.4
+        statsButton.alpha    = currentTab == .stats    ? 1.0 : 0.4
+        mapButton.alpha      = currentTab == .map      ? 1.0 : 0.4
     }
 
-    @objc func homeTapped()  { switchTo(.home) }
-    @objc func statsTapped() { switchTo(.stats) }
-    @objc func mapTapped()   { switchTo(.map) }
+    @objc func homeTapped()     { switchTo(.home) }
+    @objc func discoverTapped() { switchTo(.discover) }
+    @objc func statsTapped()    { switchTo(.stats) }
+    @objc func mapTapped()      { switchTo(.map) }
 }
 
 extension ViewController: MKMapViewDelegate {
@@ -316,7 +472,7 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: UIFont.albertSans(.semiBold, size: 12),
+            .font: UIFont.karla(.semibold, size: 12),
             .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
             .kern: 1.5,
         ]
