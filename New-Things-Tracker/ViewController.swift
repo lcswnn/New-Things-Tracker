@@ -36,8 +36,7 @@ class ViewController: UIViewController {
     private var discoverView: UIView!
     private var discoverVC: DiscoverViewController!
     private var statsVC: StatsViewController!
-    private var leftIsland: UIView!
-    private var rightIsland: UIView!
+    private var islandBar: UIView!
     private var tableView: UITableView!
     private var homeButton: UIButton!
     private var discoverButton: UIButton!
@@ -46,16 +45,20 @@ class ViewController: UIViewController {
     private var addButton: UIButton!
     private var addButtonContainer: UIView!
 
-    private var navBarViews: [UIView] { [leftIsland, addButtonContainer, rightIsland] }
+    private var navBarViews: [UIView] { [islandBar, addButtonContainer] }
     private var greetingLabel: UILabel!
     private var dateLabel: UILabel!
     private var esriLabel: UILabel!
     private weak var headerFadeView: UIView?
-    private let headerFadeLayer = CAGradientLayer()
     private var isBarHidden = false
     private var isMapMoving = false
 
     override var prefersStatusBarHidden: Bool { true }
+
+    private let reviewItems: [ReviewItem] = [
+        ReviewItem(label: "Green Mill Cocktail Lounge", date: "Today",  reason: "Confirm label"),
+        ReviewItem(label: "Unknown Venue",               date: "Sep 6", reason: "Possible duplicate of Randolph Street Market"),
+    ]
 
     private let sections: [(month: String, firsts: [First])] = [
         ("SEPTEMBER", [
@@ -91,7 +94,7 @@ class ViewController: UIViewController {
         setupProfileButton()
         setupHeaderLabels()
         setupCardsTable()
-        setupHeaderFade()
+        setupHeaderLine()
         setupNavBar()           // last — stays above all content
 
         // Start off-screen for entrance animation
@@ -107,13 +110,6 @@ class ViewController: UIViewController {
                 view.transform = .identity
                 view.alpha = 1
             }
-        }
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        if let fadeView = headerFadeView {
-            headerFadeLayer.frame = fadeView.bounds
         }
     }
 
@@ -275,7 +271,8 @@ class ViewController: UIViewController {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: islandClearance, right: 0)
-        tableView.register(FirstCardCell.self, forCellReuseIdentifier: FirstCardCell.identifier)
+        tableView.register(FirstCardCell.self,   forCellReuseIdentifier: FirstCardCell.identifier)
+        tableView.register(ReviewQueueCell.self, forCellReuseIdentifier: ReviewQueueCell.identifier)
         tableView.dataSource = self
         tableView.delegate = self
         view.addSubview(tableView)
@@ -288,32 +285,107 @@ class ViewController: UIViewController {
         ])
     }
 
-    private func setupHeaderFade() {
-        let fadeView = UIView()
-        fadeView.translatesAutoresizingMaskIntoConstraints = false
-        fadeView.isUserInteractionEnabled = false
-        headerFadeView = fadeView
-        view.insertSubview(fadeView, aboveSubview: tableView)
-
-        let bg = UIColor(named: "DustySage") ?? UIColor(red: 0.70, green: 0.75, blue: 0.68, alpha: 1)
-        headerFadeLayer.colors = [bg.cgColor, bg.withAlphaComponent(0).cgColor]
-        headerFadeLayer.locations = [0.0, 1.0]
-        fadeView.layer.addSublayer(headerFadeLayer)
+    private func setupHeaderLine() {
+        let line = UIView()
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.isUserInteractionEnabled = false
+        line.backgroundColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.20)
+        headerFadeView = line
+        view.insertSubview(line, aboveSubview: tableView)
 
         NSLayoutConstraint.activate([
-            fadeView.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 8),
-            fadeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            fadeView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            fadeView.heightAnchor.constraint(equalToConstant: 48),
+            line.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 8),
+            line.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            line.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            line.heightAnchor.constraint(equalToConstant: 0.5),
         ])
     }
 
     private func setupNavBar() {
-        // ── Center add button ──────────────────────────────────────────
+        setupIslandBar()
+        setupAddButton()
+    }
+
+    private func setupIslandBar() {
+        // islandBar is a clear shadow-casting container; the blur lives inside it
+        islandBar = UIView()
+        islandBar.translatesAutoresizingMaskIntoConstraints = false
+        islandBar.backgroundColor = .clear
+        islandBar.layer.shadowColor = UIColor.black.cgColor
+        islandBar.layer.shadowOpacity = 0.18
+        islandBar.layer.shadowOffset = CGSize(width: 0, height: 6)
+        islandBar.layer.shadowRadius = 18
+        // Explicit path so the shadow renders on a clear background
+        islandBar.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 290, height: 60), cornerRadius: 30).cgPath
+        view.addSubview(islandBar)
+
+        NSLayoutConstraint.activate([
+            islandBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            islandBar.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: -33),
+            islandBar.heightAnchor.constraint(equalToConstant: 60),
+            islandBar.widthAnchor.constraint(equalToConstant: 290),
+        ])
+
+        // Frosted glass fill clipped to the pill shape
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        blur.layer.cornerRadius = 30
+        blur.layer.masksToBounds = true
+        islandBar.addSubview(blur)
+        NSLayoutConstraint.activate([
+            blur.topAnchor.constraint(equalTo: islandBar.topAnchor),
+            blur.bottomAnchor.constraint(equalTo: islandBar.bottomAnchor),
+            blur.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor),
+        ])
+
+        // DeepPineInk tint over the blur — keeps the dark color while letting frost show through
+        let tint = UIView()
+        tint.translatesAutoresizingMaskIntoConstraints = false
+        tint.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.78)
+        blur.contentView.addSubview(tint)
+        NSLayoutConstraint.activate([
+            tint.topAnchor.constraint(equalTo: blur.contentView.topAnchor),
+            tint.bottomAnchor.constraint(equalTo: blur.contentView.bottomAnchor),
+            tint.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor),
+            tint.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor),
+        ])
+
+        homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
+        discoverButton = makeIslandButton(image: UIImage(named: "icon-navigate"), action: #selector(discoverTapped))
+        statsButton    = makeIslandButton(image: UIImage(named: "icon-chart"),    action: #selector(statsTapped))
+        mapButton      = makeIslandButton(image: UIImage(named: "icon-map"),      action: #selector(mapTapped))
+
+        discoverButton.contentHorizontalAlignment = .fill
+        discoverButton.contentVerticalAlignment = .fill
+        discoverButton.imageView?.contentMode = .scaleAspectFit
+        NSLayoutConstraint.activate([
+            discoverButton.widthAnchor.constraint(equalToConstant: 29),
+            discoverButton.heightAnchor.constraint(equalToConstant: 29),
+        ])
+
+        // Buttons go into contentView so touches aren't eaten by the effect view
+        let stack = UIStackView(arrangedSubviews: [homeButton, discoverButton, statsButton, mapButton])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.distribution = .equalSpacing
+        stack.alignment = .center
+        blur.contentView.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: blur.contentView.centerYAnchor),
+        ])
+
+        updateIslandSelection()
+    }
+
+    private func setupAddButton() {
         addButtonContainer = UIView()
         addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
         addButtonContainer.backgroundColor = UIColor(named: "ClayAccent")
-        addButtonContainer.layer.cornerRadius = 30
+        addButtonContainer.layer.cornerRadius = 27
         addButtonContainer.layer.shadowColor = UIColor.black.cgColor
         addButtonContainer.layer.shadowOpacity = 0.2
         addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
@@ -331,85 +403,17 @@ class ViewController: UIViewController {
         addButton.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButtonContainer.addSubview(addButton)
 
-        // ── Left island: Home + Discover ──────────────────────────────
-        leftIsland = makeIslandPill()
-        view.addSubview(leftIsland)
-
-        homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
-        discoverButton = makeIslandButton(image: UIImage(named: "icon-navigate"), action: #selector(discoverTapped))
-        discoverButton.contentHorizontalAlignment = .fill
-        discoverButton.contentVerticalAlignment = .fill
-        discoverButton.imageView?.contentMode = .scaleAspectFit
         NSLayoutConstraint.activate([
-            discoverButton.widthAnchor.constraint(equalToConstant: 29),
-            discoverButton.heightAnchor.constraint(equalToConstant: 29),
-        ])
+            addButtonContainer.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
+            addButtonContainer.leadingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: 12),
+            addButtonContainer.widthAnchor.constraint(equalToConstant: 54),
+            addButtonContainer.heightAnchor.constraint(equalToConstant: 54),
 
-        let leftStack = UIStackView(arrangedSubviews: [homeButton, discoverButton])
-        leftStack.translatesAutoresizingMaskIntoConstraints = false
-        leftStack.axis = .horizontal
-        leftStack.distribution = .equalSpacing
-        leftStack.alignment = .center
-        leftIsland.addSubview(leftStack)
-
-        // ── Right island: Stats + Map ──────────────────────────────────
-        rightIsland = makeIslandPill()
-        view.addSubview(rightIsland)
-
-        statsButton = makeIslandButton(image: UIImage(named: "icon-chart"), action: #selector(statsTapped))
-        mapButton   = makeIslandButton(image: UIImage(named: "icon-map"),   action: #selector(mapTapped))
-
-        let rightStack = UIStackView(arrangedSubviews: [statsButton, mapButton])
-        rightStack.translatesAutoresizingMaskIntoConstraints = false
-        rightStack.axis = .horizontal
-        rightStack.distribution = .equalSpacing
-        rightStack.alignment = .center
-        rightIsland.addSubview(rightStack)
-
-        // ── Layout ────────────────────────────────────────────────────
-        NSLayoutConstraint.activate([
-            // Add button: perfectly centered, same height as islands
-            addButtonContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            addButtonContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
-            addButtonContainer.widthAnchor.constraint(equalToConstant: 60),
-            addButtonContainer.heightAnchor.constraint(equalToConstant: 60),
             addButton.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
             addButton.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
             addButton.leadingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor),
             addButton.trailingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor),
-
-            // Left island: leading edge to screen edge, trailing to add button
-            leftIsland.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            leftIsland.trailingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor, constant: -10),
-            leftIsland.centerYAnchor.constraint(equalTo: addButtonContainer.centerYAnchor),
-            leftIsland.heightAnchor.constraint(equalToConstant: 60),
-            leftStack.leadingAnchor.constraint(equalTo: leftIsland.leadingAnchor, constant: 22),
-            leftStack.trailingAnchor.constraint(equalTo: leftIsland.trailingAnchor, constant: -22),
-            leftStack.centerYAnchor.constraint(equalTo: leftIsland.centerYAnchor),
-
-            // Right island: leading from add button, trailing to screen edge
-            rightIsland.leadingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor, constant: 10),
-            rightIsland.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            rightIsland.centerYAnchor.constraint(equalTo: addButtonContainer.centerYAnchor),
-            rightIsland.heightAnchor.constraint(equalToConstant: 60),
-            rightStack.leadingAnchor.constraint(equalTo: rightIsland.leadingAnchor, constant: 22),
-            rightStack.trailingAnchor.constraint(equalTo: rightIsland.trailingAnchor, constant: -22),
-            rightStack.centerYAnchor.constraint(equalTo: rightIsland.centerYAnchor),
         ])
-
-        updateIslandSelection()
-    }
-
-    private func makeIslandPill() -> UIView {
-        let pill = UIView()
-        pill.translatesAutoresizingMaskIntoConstraints = false
-        pill.backgroundColor = UIColor(named: "DeepPineInk")
-        pill.layer.cornerRadius = 30
-        pill.layer.shadowColor = UIColor.black.cgColor
-        pill.layer.shadowOpacity = 0.2
-        pill.layer.shadowOffset = CGSize(width: 0, height: 4)
-        pill.layer.shadowRadius = 12
-        return pill
     }
 
     private func makeIslandButton(image: UIImage?, action: Selector) -> UIButton {
@@ -477,10 +481,10 @@ class ViewController: UIViewController {
         mapButton.setImage(UIImage(named: currentTab == .map
             ? "icon-map-filled" : "icon-map"), for: .normal)
 
-        homeButton.alpha     = currentTab == .home     ? 1.0 : 0.4
-        discoverButton.alpha = currentTab == .discover ? 1.0 : 0.4
-        statsButton.alpha    = currentTab == .stats    ? 1.0 : 0.4
-        mapButton.alpha      = currentTab == .map      ? 1.0 : 0.4
+        homeButton.alpha     = currentTab == .home     ? 1.0 : 0.40
+        discoverButton.alpha = currentTab == .discover ? 1.0 : 0.40
+        statsButton.alpha    = currentTab == .stats    ? 1.0 : 0.40
+        mapButton.alpha      = currentTab == .map      ? 1.0 : 0.40
     }
 
     @objc func homeTapped()     { switchTo(.home) }
@@ -536,41 +540,84 @@ extension ViewController: MKMapViewDelegate {
 }
 
 extension ViewController: UITableViewDataSource, UITableViewDelegate {
+
     func numberOfSections(in tableView: UITableView) -> Int {
-        sections.count
+        sections.count + 1   // section 0 = review queue
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        sections[section].firsts.count
+        section == 0 ? reviewItems.count : sections[section - 1].firsts.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.section == 0 {
+            let cell = tableView.dequeueReusableCell(withIdentifier: ReviewQueueCell.identifier, for: indexPath) as! ReviewQueueCell
+            cell.configure(with: reviewItems[indexPath.row])
+            return cell
+        }
         let cell = tableView.dequeueReusableCell(withIdentifier: FirstCardCell.identifier, for: indexPath) as! FirstCardCell
-        cell.configure(with: sections[indexPath.section].firsts[indexPath.row])
+        cell.configure(with: sections[indexPath.section - 1].firsts[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let container = UIView()
+        container.backgroundColor = .clear
+
+        if section == 0 {
+            let label = UILabel()
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.attributedText = NSAttributedString(string: "NEEDS REVIEW", attributes: [
+                .font: UIFont.karla(.bold, size: 14),
+                .foregroundColor: UIColor(named: "FogBackground") ?? UIColor.white,
+                .kern: 1.8,
+            ])
+            container.addSubview(label)
+
+            let badge = UIView()
+            badge.translatesAutoresizingMaskIntoConstraints = false
+            badge.backgroundColor = UIColor(named: "ClayAccent")
+            badge.layer.cornerRadius = 10
+            container.addSubview(badge)
+
+            let badgeLabel = UILabel()
+            badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+            badgeLabel.text = "\(reviewItems.count)"
+            badgeLabel.font = UIFont.karla(.bold, size: 12)
+            badgeLabel.textColor = UIColor(named: "FogBackground")
+            badge.addSubview(badgeLabel)
+
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+
+                badge.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
+                badge.centerYAnchor.constraint(equalTo: label.centerYAnchor),
+
+                badgeLabel.topAnchor.constraint(equalTo: badge.topAnchor, constant: 3),
+                badgeLabel.bottomAnchor.constraint(equalTo: badge.bottomAnchor, constant: -3),
+                badgeLabel.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 8),
+                badgeLabel.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -8),
+            ])
+            return container
+        }
+
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        let attrs: [NSAttributedString.Key: Any] = [
+        label.attributedText = NSAttributedString(string: sections[section - 1].month, attributes: [
             .font: UIFont.karla(.semibold, size: 12),
             .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
             .kern: 1.5,
-        ]
-        label.attributedText = NSAttributedString(string: sections[section].month, attributes: attrs)
+        ])
         container.addSubview(label)
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
             label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
             label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
         ])
-        container.backgroundColor = .clear
         return container
     }
 
-    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        36
-    }
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 36 }
 }

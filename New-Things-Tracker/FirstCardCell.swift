@@ -222,3 +222,245 @@ class FirstCardCell: UITableViewCell {
         subtitleLabel.text = "\(first.location) · \(first.duration), \(first.photoCount) photos"
     }
 }
+
+// MARK: - Occasion model
+
+struct Occasion {
+    let label: String
+    let location: String
+    let category: String
+    let duration: String
+    let photoCount: Int
+    let isNew: Bool
+}
+
+// MARK: - ReviewItem model
+
+struct ReviewItem {
+    let label: String
+    let date: String
+    let reason: String
+}
+
+// MARK: - OccasionCell
+
+class OccasionCell: UITableViewCell {
+    static let identifier = "OccasionCell"
+
+    private let card = UIView()
+    private let newBadge = UIView()
+    private let newBadgeLabel = UILabel()
+    private let titleLabel = UILabel()
+    private let detailLabel = UILabel()
+    private let photoContainer = UIView()
+    private let photoLabel = UILabel()
+
+    private var titleLeadingNew: NSLayoutConstraint!
+    private var titleLeadingNormal: NSLayoutConstraint!
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupCell()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupCell() {
+        backgroundColor = .clear
+        selectionStyle = .none
+
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(named: "FogBackground")
+        card.layer.cornerRadius = 18
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.08
+        card.layer.shadowOffset = CGSize(width: 0, height: 2)
+        card.layer.shadowRadius = 8
+        contentView.addSubview(card)
+
+        newBadge.translatesAutoresizingMaskIntoConstraints = false
+        newBadge.backgroundColor = UIColor(named: "ClayAccent")
+        newBadge.layer.cornerRadius = 9
+        card.addSubview(newBadge)
+
+        newBadgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        newBadgeLabel.text = "NEW"
+        newBadgeLabel.font = .karla(.bold, size: 10)
+        newBadgeLabel.textColor = UIColor(named: "FogBackground")
+        newBadge.addSubview(newBadgeLabel)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .fraunces(.regular, size: 18)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        titleLabel.numberOfLines = 1
+        card.addSubview(titleLabel)
+
+        detailLabel.translatesAutoresizingMaskIntoConstraints = false
+        detailLabel.font = .karla(.regular, size: 13)
+        detailLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.45)
+        card.addSubview(detailLabel)
+
+        photoContainer.translatesAutoresizingMaskIntoConstraints = false
+        photoContainer.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.07)
+        photoContainer.layer.cornerRadius = 10
+        card.addSubview(photoContainer)
+
+        photoLabel.translatesAutoresizingMaskIntoConstraints = false
+        photoLabel.font = .karla(.medium, size: 12)
+        photoLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.50)
+        photoContainer.addSubview(photoLabel)
+
+        titleLeadingNew    = titleLabel.leadingAnchor.constraint(equalTo: newBadge.trailingAnchor, constant: 10)
+        titleLeadingNormal = titleLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            newBadge.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            newBadge.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            newBadge.widthAnchor.constraint(equalToConstant: 36),
+            newBadge.heightAnchor.constraint(equalToConstant: 18),
+
+            newBadgeLabel.centerXAnchor.constraint(equalTo: newBadge.centerXAnchor),
+            newBadgeLabel.centerYAnchor.constraint(equalTo: newBadge.centerYAnchor),
+
+            photoContainer.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            photoContainer.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+
+            photoLabel.topAnchor.constraint(equalTo: photoContainer.topAnchor, constant: 4),
+            photoLabel.bottomAnchor.constraint(equalTo: photoContainer.bottomAnchor, constant: -4),
+            photoLabel.leadingAnchor.constraint(equalTo: photoContainer.leadingAnchor, constant: 8),
+            photoLabel.trailingAnchor.constraint(equalTo: photoContainer.trailingAnchor, constant: -8),
+
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            titleLabel.trailingAnchor.constraint(equalTo: photoContainer.leadingAnchor, constant: -8),
+
+            detailLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            detailLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            detailLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            detailLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+        ])
+    }
+
+    func configure(with occasion: Occasion) {
+        titleLabel.text = occasion.label
+        detailLabel.text = "\(occasion.location) · \(occasion.duration) · \(occasion.category)"
+
+        newBadge.isHidden = !occasion.isNew
+        titleLeadingNew.isActive = occasion.isNew
+        titleLeadingNormal.isActive = !occasion.isNew
+
+        if occasion.photoCount > 0 {
+            photoLabel.text = "📷 \(occasion.photoCount)"
+            photoContainer.isHidden = false
+        } else {
+            photoContainer.isHidden = true
+        }
+    }
+}
+
+// MARK: - ReviewQueueCell
+
+class ReviewQueueCell: UITableViewCell {
+    static let identifier = "ReviewQueueCell"
+
+    private let card = UIView()
+    private let accentBar = UIView()
+    private let iconLabel = UILabel()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let chevron = UIImageView()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupCell()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupCell() {
+        backgroundColor = .clear
+        selectionStyle = .none
+
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(named: "FogBackground")
+        card.layer.cornerRadius = 14
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.07
+        card.layer.shadowOffset = CGSize(width: 0, height: 2)
+        card.layer.shadowRadius = 6
+        contentView.addSubview(card)
+
+        accentBar.translatesAutoresizingMaskIntoConstraints = false
+        accentBar.backgroundColor = UIColor(named: "ClayAccent")
+        accentBar.layer.cornerRadius = 1.5
+        card.addSubview(accentBar)
+
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        iconLabel.text = "!"
+        iconLabel.font = .karla(.bold, size: 13)
+        iconLabel.textColor = UIColor(named: "ClayAccent")
+        iconLabel.textAlignment = .center
+        iconLabel.backgroundColor = UIColor(named: "ClayAccent")?.withAlphaComponent(0.15)
+        iconLabel.layer.cornerRadius = 12
+        iconLabel.layer.masksToBounds = true
+        card.addSubview(iconLabel)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .fraunces(.bold, size: 18)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        titleLabel.numberOfLines = 1
+        card.addSubview(titleLabel)
+
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.font = .karla(.medium, size: 13)
+        subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.52)
+        subtitleLabel.numberOfLines = 1
+        card.addSubview(subtitleLabel)
+
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        chevron.image = UIImage(systemName: "chevron.right",
+                                withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium))
+        chevron.tintColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.25)
+        chevron.contentMode = .scaleAspectFit
+        card.addSubview(chevron)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 5),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -5),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            accentBar.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
+            accentBar.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            accentBar.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            accentBar.widthAnchor.constraint(equalToConstant: 3),
+
+            iconLabel.leadingAnchor.constraint(equalTo: accentBar.trailingAnchor, constant: 12),
+            iconLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            iconLabel.widthAnchor.constraint(equalToConstant: 24),
+            iconLabel.heightAnchor.constraint(equalToConstant: 24),
+
+            titleLabel.leadingAnchor.constraint(equalTo: iconLabel.trailingAnchor, constant: 10),
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            titleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            subtitleLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+            subtitleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
+
+            chevron.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            chevron.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 12),
+        ])
+    }
+
+    func configure(with item: ReviewItem) {
+        titleLabel.text = item.label
+        subtitleLabel.text = "\(item.date) · \(item.reason)"
+    }
+}
