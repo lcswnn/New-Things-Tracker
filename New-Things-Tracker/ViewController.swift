@@ -323,8 +323,10 @@ class ViewController: UIViewController {
             islandBar.widthAnchor.constraint(equalToConstant: 290),
         ])
 
-        // Liquid Glass pill — untinted so it reads as true glass
-        let glass = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+        // Liquid Glass pill tinted dark so it pops against any background
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.tintColor = UIColor(named: "DeepPineInk")
+        let glass = UIVisualEffectView(effect: glassEffect)
         glass.translatesAutoresizingMaskIntoConstraints = false
         glass.layer.cornerRadius = 30
         glass.layer.masksToBounds = true
@@ -420,7 +422,7 @@ class ViewController: UIViewController {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(image, for: .normal)
-        button.tintColor = UIColor(named: "DeepPineInk")
+        button.tintColor = UIColor(named: "FogBackground")
         button.addTarget(self, action: action, for: .touchUpInside)
         button.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
         button.addTarget(self, action: #selector(islandButtonPressUp(_:)),   for: [.touchUpInside, .touchUpOutside, .touchCancel])
