@@ -15,6 +15,13 @@ private class EsriLightGrayTileOverlay: MKTileOverlay {
     }
 }
 
+// Reference layer adds roads, boundaries, and labels on top of the base
+private class EsriLightGrayReferenceOverlay: MKTileOverlay {
+    override func url(forTilePath path: MKTileOverlayPath) -> URL {
+        URL(string: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/\(path.z)/\(path.y)/\(path.x)")!
+    }
+}
+
 class ViewController: UIViewController {
 
     private enum Tab { case home, discover, stats, map }
@@ -39,6 +46,8 @@ class ViewController: UIViewController {
     private let headerFadeLayer = CAGradientLayer()
     private var isBarHidden = false
     private var isMapMoving = false
+
+    override var prefersStatusBarHidden: Bool { true }
 
     private let sections: [(month: String, firsts: [First])] = [
         ("SEPTEMBER", [
@@ -113,10 +122,15 @@ class ViewController: UIViewController {
         mapView.showsCompass = false
         mapView.showsScale = false
 
-        // Esri World Light Gray — white bg, country/state borders, free without API key
+        // Esri World Light Gray — base layer (terrain, water, land)
         let tileOverlay = EsriLightGrayTileOverlay()
         tileOverlay.canReplaceMapContent = true
         mapView.addOverlay(tileOverlay, level: .aboveLabels)
+
+        // Reference layer adds roads, borders, and place outlines on top
+        let referenceOverlay = EsriLightGrayReferenceOverlay()
+        referenceOverlay.canReplaceMapContent = false
+        mapView.addOverlay(referenceOverlay, level: .aboveLabels)
 
         let mapTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMapTap(_:)))
         mapView.addGestureRecognizer(mapTapGesture)
