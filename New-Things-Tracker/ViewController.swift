@@ -37,6 +37,8 @@ class ViewController: UIViewController {
     private var esriLabel: UILabel!
     private weak var headerFadeView: UIView?
     private let headerFadeLayer = CAGradientLayer()
+    private var isBarHidden = false
+    private var isMapMoving = false
 
     private let sections: [(month: String, firsts: [First])] = [
         ("SEPTEMBER", [
@@ -75,6 +77,25 @@ class ViewController: UIViewController {
         setupAddButton()
         setupCardsTable()
         setupHeaderFade()
+
+        // Start off-screen for entrance animation
+        let offscreen = CGAffineTransform(translationX: 0, y: 120)
+        islandBar.transform = offscreen
+        islandBar.alpha = 0
+        addButtonContainer.transform = offscreen
+        addButtonContainer.alpha = 0
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        UIView.animate(withDuration: 0.52, delay: 0.08, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.islandBar.transform = .identity
+            self.islandBar.alpha = 1
+        }
+        UIView.animate(withDuration: 0.52, delay: 0.14, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.addButtonContainer.transform = .identity
+            self.addButtonContainer.alpha = 1
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -96,6 +117,9 @@ class ViewController: UIViewController {
         let tileOverlay = EsriLightGrayTileOverlay()
         tileOverlay.canReplaceMapContent = true
         mapView.addOverlay(tileOverlay, level: .aboveLabels)
+
+        let mapTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMapTap(_:)))
+        mapView.addGestureRecognizer(mapTapGesture)
 
         view.addSubview(mapView)
 
@@ -259,15 +283,13 @@ class ViewController: UIViewController {
     private func setupIslandBar() {
         islandBar = UIView()
         islandBar.translatesAutoresizingMaskIntoConstraints = false
-        islandBar.backgroundColor = .clear
+        islandBar.backgroundColor = UIColor(named: "DeepPineInk")
         islandBar.layer.cornerRadius = 30
         islandBar.layer.shadowColor = UIColor.black.cgColor
-        islandBar.layer.shadowOpacity = 0.25
+        islandBar.layer.shadowOpacity = 0.2
         islandBar.layer.shadowOffset = CGSize(width: 0, height: 4)
         islandBar.layer.shadowRadius = 12
-        islandBar.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 290, height: 60), cornerRadius: 30).cgPath
         view.addSubview(islandBar)
-        insertFrostBackground(into: islandBar, cornerRadius: 30, tintColor: UIColor(named: "DeepPineInk") ?? .black, tintAlpha: 0.55)
 
         NSLayoutConstraint.activate([
             islandBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
@@ -307,17 +329,14 @@ class ViewController: UIViewController {
     }
 
     private func setupAddButton() {
-        // Container holds the shadow + frost so the UIButton inside stays untouched
         addButtonContainer = UIView()
         addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
-        addButtonContainer.backgroundColor = .clear
+        addButtonContainer.backgroundColor = UIColor(named: "ClayAccent")
         addButtonContainer.layer.cornerRadius = 27
         addButtonContainer.layer.shadowColor = UIColor.black.cgColor
-        addButtonContainer.layer.shadowOpacity = 0.25
+        addButtonContainer.layer.shadowOpacity = 0.2
         addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
         addButtonContainer.layer.shadowRadius = 8
-        addButtonContainer.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 54, height: 54), cornerRadius: 27).cgPath
-        insertFrostBackground(into: addButtonContainer, cornerRadius: 27, tintColor: UIColor(named: "ClayAccent") ?? .orange, tintAlpha: 0.65)
         view.addSubview(addButtonContainer)
 
         // Button sits on top of the frost view as a sibling — never inside UIVisualEffectView
@@ -356,32 +375,6 @@ class ViewController: UIViewController {
         return button
     }
 
-    private func insertFrostBackground(into view: UIView, cornerRadius: CGFloat, tintColor: UIColor, tintAlpha: CGFloat) {
-        let frostView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
-        frostView.translatesAutoresizingMaskIntoConstraints = false
-        frostView.layer.cornerRadius = cornerRadius
-        frostView.clipsToBounds = true
-
-        let tint = UIView()
-        tint.translatesAutoresizingMaskIntoConstraints = false
-        tint.backgroundColor = tintColor.withAlphaComponent(tintAlpha)
-        frostView.contentView.addSubview(tint)
-        NSLayoutConstraint.activate([
-            tint.topAnchor.constraint(equalTo: frostView.contentView.topAnchor),
-            tint.bottomAnchor.constraint(equalTo: frostView.contentView.bottomAnchor),
-            tint.leadingAnchor.constraint(equalTo: frostView.contentView.leadingAnchor),
-            tint.trailingAnchor.constraint(equalTo: frostView.contentView.trailingAnchor),
-        ])
-
-        view.insertSubview(frostView, at: 0)
-        NSLayoutConstraint.activate([
-            frostView.topAnchor.constraint(equalTo: view.topAnchor),
-            frostView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            frostView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            frostView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-    }
-
     @objc private func islandButtonPressDown(_ sender: UIButton) {
         let target: UIView = (sender == addButton) ? addButtonContainer : sender
         UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
@@ -407,6 +400,14 @@ class ViewController: UIViewController {
     private func switchTo(_ tab: Tab) {
         guard tab != currentTab else { return }
         currentTab = tab
+
+        if isBarHidden {
+            isBarHidden = false
+            islandBar.transform = .identity
+            islandBar.alpha = 1
+            addButtonContainer.transform = .identity
+            addButtonContainer.alpha = 1
+        }
 
         mapView.alpha              = tab == .map      ? 1 : 0
         statsView.isHidden         = tab != .stats
@@ -441,6 +442,43 @@ class ViewController: UIViewController {
     @objc func discoverTapped() { switchTo(.discover) }
     @objc func statsTapped()    { switchTo(.stats) }
     @objc func mapTapped()      { switchTo(.map) }
+
+    @objc private func handleMapTap(_ gesture: UITapGestureRecognizer) {
+        guard isBarHidden else { return }
+        // Short delay lets double-tap zoom trigger regionWillChangeAnimated first,
+        // so isMapMoving is true before we decide to show.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self, self.isBarHidden, !self.isMapMoving else { return }
+            self.showBarAnimated()
+        }
+    }
+
+    private func hideBarAnimated() {
+        guard !isBarHidden else { return }
+        isBarHidden = true
+        let offscreen = CGAffineTransform(translationX: 0, y: 120)
+        UIView.animate(withDuration: 0.52, delay: 0, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseIn, .allowUserInteraction]) {
+            self.addButtonContainer.transform = offscreen
+            self.addButtonContainer.alpha = 0
+        }
+        UIView.animate(withDuration: 0.52, delay: 0.06, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseIn, .allowUserInteraction]) {
+            self.islandBar.transform = offscreen
+            self.islandBar.alpha = 0
+        }
+    }
+
+    private func showBarAnimated() {
+        guard isBarHidden else { return }
+        isBarHidden = false
+        UIView.animate(withDuration: 0.52, delay: 0.04, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.islandBar.transform = .identity
+            self.islandBar.alpha = 1
+        }
+        UIView.animate(withDuration: 0.52, delay: 0.1, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.addButtonContainer.transform = .identity
+            self.addButtonContainer.alpha = 1
+        }
+    }
 }
 
 extension ViewController: MKMapViewDelegate {
@@ -449,6 +487,16 @@ extension ViewController: MKMapViewDelegate {
             return MKTileOverlayRenderer(tileOverlay: tileOverlay)
         }
         return MKOverlayRenderer(overlay: overlay)
+    }
+
+    func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
+        guard currentTab == .map else { return }
+        isMapMoving = true
+        hideBarAnimated()
+    }
+
+    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+        isMapMoving = false
     }
 }
 
