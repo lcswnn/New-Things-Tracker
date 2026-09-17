@@ -31,6 +31,7 @@ class ViewController: UIViewController {
     private let islandClearance: CGFloat = 60 + 16 + 10
 
     private var profileButtonView: UIButton!
+    private var profileButtonContainer: UIView!
     private var mapView: MKMapView!
     private var statsView: UIView!
     private var discoverView: UIView!
@@ -204,17 +205,12 @@ class ViewController: UIViewController {
         profileButtonView = UIButton(type: .system)
         profileButtonView.translatesAutoresizingMaskIntoConstraints = false
         profileButtonView.setImage(UIImage(named: "icon-account"), for: .normal)
-        profileButtonView.imageEdgeInsets = UIEdgeInsets(top: 11, left: 11, bottom: 11, right: 11)
-        profileButtonView.tintColor = UIColor(named: "FogBackground")
-        profileButtonView.backgroundColor = UIColor(named: "DeepPineInk")
-        profileButtonView.layer.cornerRadius = 20
-        profileButtonView.layer.shadowColor = UIColor.black.cgColor
-        profileButtonView.layer.shadowOpacity = 0.15
-        profileButtonView.layer.shadowOffset = CGSize(width: 0, height: 3)
-        profileButtonView.layer.shadowRadius = 6
+        profileButtonView.tintColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.75)
+        profileButtonView.backgroundColor = .clear
         profileButtonView.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
         profileButtonView.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
         profileButtonView.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        profileButtonContainer = profileButtonView  // animate the button itself
         view.addSubview(profileButtonView)
 
         NSLayoutConstraint.activate([
@@ -326,29 +322,17 @@ class ViewController: UIViewController {
             islandBar.widthAnchor.constraint(equalToConstant: 290),
         ])
 
-        // Frosted glass fill clipped to the pill shape
-        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
-        blur.translatesAutoresizingMaskIntoConstraints = false
-        blur.layer.cornerRadius = 30
-        blur.layer.masksToBounds = true
-        islandBar.addSubview(blur)
+        // Liquid Glass pill — untinted so it reads as true glass
+        let glass = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+        glass.translatesAutoresizingMaskIntoConstraints = false
+        glass.layer.cornerRadius = 30
+        glass.layer.masksToBounds = true
+        islandBar.addSubview(glass)
         NSLayoutConstraint.activate([
-            blur.topAnchor.constraint(equalTo: islandBar.topAnchor),
-            blur.bottomAnchor.constraint(equalTo: islandBar.bottomAnchor),
-            blur.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor),
-            blur.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor),
-        ])
-
-        // DeepPineInk tint over the blur — keeps the dark color while letting frost show through
-        let tint = UIView()
-        tint.translatesAutoresizingMaskIntoConstraints = false
-        tint.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.78)
-        blur.contentView.addSubview(tint)
-        NSLayoutConstraint.activate([
-            tint.topAnchor.constraint(equalTo: blur.contentView.topAnchor),
-            tint.bottomAnchor.constraint(equalTo: blur.contentView.bottomAnchor),
-            tint.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor),
-            tint.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor),
+            glass.topAnchor.constraint(equalTo: islandBar.topAnchor),
+            glass.bottomAnchor.constraint(equalTo: islandBar.bottomAnchor),
+            glass.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor),
+            glass.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor),
         ])
 
         homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
@@ -370,12 +354,12 @@ class ViewController: UIViewController {
         stack.axis = .horizontal
         stack.distribution = .equalSpacing
         stack.alignment = .center
-        blur.contentView.addSubview(stack)
+        glass.contentView.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor, constant: -24),
-            stack.centerYAnchor.constraint(equalTo: blur.contentView.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: glass.contentView.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: glass.contentView.trailingAnchor, constant: -24),
+            stack.centerYAnchor.constraint(equalTo: glass.contentView.centerYAnchor),
         ])
 
         updateIslandSelection()
@@ -384,24 +368,34 @@ class ViewController: UIViewController {
     private func setupAddButton() {
         addButtonContainer = UIView()
         addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
-        addButtonContainer.backgroundColor = UIColor(named: "ClayAccent")
+        addButtonContainer.backgroundColor = .clear
         addButtonContainer.layer.cornerRadius = 27
         addButtonContainer.layer.shadowColor = UIColor.black.cgColor
-        addButtonContainer.layer.shadowOpacity = 0.2
+        addButtonContainer.layer.shadowOpacity = 0.18
         addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
-        addButtonContainer.layer.shadowRadius = 8
+        addButtonContainer.layer.shadowRadius = 10
+        addButtonContainer.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 54, height: 54), cornerRadius: 27).cgPath
         view.addSubview(addButtonContainer)
+
+        // Orange-tinted Liquid Glass circle
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.tintColor = UIColor(named: "ClayAccent")
+        let addGlass = UIVisualEffectView(effect: glassEffect)
+        addGlass.translatesAutoresizingMaskIntoConstraints = false
+        addGlass.layer.cornerRadius = 27
+        addGlass.layer.masksToBounds = true
+        addButtonContainer.addSubview(addGlass)
 
         addButton = UIButton(type: .system)
         addButton.translatesAutoresizingMaskIntoConstraints = false
-        let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 32, weight: .medium))
+        let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium))
         addButton.setImage(plusImage, for: .normal)
-        addButton.tintColor = UIColor(named: "FogBackground")
+        addButton.tintColor = UIColor(named: "DeepPineInk")
         addButton.backgroundColor = .clear
         addButton.addTarget(self, action: #selector(addEventTapped), for: .touchUpInside)
         addButton.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
         addButton.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        addButtonContainer.addSubview(addButton)
+        addGlass.contentView.addSubview(addButton)
 
         NSLayoutConstraint.activate([
             addButtonContainer.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
@@ -409,10 +403,15 @@ class ViewController: UIViewController {
             addButtonContainer.widthAnchor.constraint(equalToConstant: 54),
             addButtonContainer.heightAnchor.constraint(equalToConstant: 54),
 
-            addButton.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
-            addButton.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
-            addButton.leadingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor),
-            addButton.trailingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor),
+            addGlass.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
+            addGlass.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
+            addGlass.leadingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor),
+            addGlass.trailingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor),
+
+            addButton.topAnchor.constraint(equalTo: addGlass.contentView.topAnchor),
+            addButton.bottomAnchor.constraint(equalTo: addGlass.contentView.bottomAnchor),
+            addButton.leadingAnchor.constraint(equalTo: addGlass.contentView.leadingAnchor),
+            addButton.trailingAnchor.constraint(equalTo: addGlass.contentView.trailingAnchor),
         ])
     }
 
@@ -420,7 +419,7 @@ class ViewController: UIViewController {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(image, for: .normal)
-        button.tintColor = UIColor(named: "FogBackground")
+        button.tintColor = UIColor(named: "DeepPineInk")
         button.addTarget(self, action: action, for: .touchUpInside)
         button.addTarget(self, action: #selector(islandButtonPressDown(_:)), for: .touchDown)
         button.addTarget(self, action: #selector(islandButtonPressUp(_:)),   for: [.touchUpInside, .touchUpOutside, .touchCancel])
@@ -428,14 +427,24 @@ class ViewController: UIViewController {
     }
 
     @objc private func islandButtonPressDown(_ sender: UIButton) {
-        let target: UIView = (sender == addButton) ? addButtonContainer : sender
+        let target: UIView
+        switch sender {
+        case addButton:         target = addButtonContainer
+        case profileButtonView: target = profileButtonContainer
+        default:                target = sender
+        }
         UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseIn, .allowUserInteraction]) {
             target.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
         }
     }
 
     @objc private func islandButtonPressUp(_ sender: UIButton) {
-        let target: UIView = (sender == addButton) ? addButtonContainer : sender
+        let target: UIView
+        switch sender {
+        case addButton:         target = addButtonContainer
+        case profileButtonView: target = profileButtonContainer
+        default:                target = sender
+        }
         UIView.animate(withDuration: 0.8, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
             target.transform = .identity
         }
@@ -481,10 +490,10 @@ class ViewController: UIViewController {
         mapButton.setImage(UIImage(named: currentTab == .map
             ? "icon-map-filled" : "icon-map"), for: .normal)
 
-        homeButton.alpha     = currentTab == .home     ? 1.0 : 0.40
-        discoverButton.alpha = currentTab == .discover ? 1.0 : 0.40
-        statsButton.alpha    = currentTab == .stats    ? 1.0 : 0.40
-        mapButton.alpha      = currentTab == .map      ? 1.0 : 0.40
+        homeButton.alpha     = currentTab == .home     ? 1.0 : 0.35
+        discoverButton.alpha = currentTab == .discover ? 1.0 : 0.35
+        statsButton.alpha    = currentTab == .stats    ? 1.0 : 0.35
+        mapButton.alpha      = currentTab == .map      ? 1.0 : 0.35
     }
 
     @objc func homeTapped()     { switchTo(.home) }
@@ -506,16 +515,26 @@ class ViewController: UIViewController {
         guard !isBarHidden else { return }
         isBarHidden = true
         let offscreen = CGAffineTransform(translationX: 0, y: 120)
-        UIView.animate(withDuration: 0.52, delay: 0, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseIn, .allowUserInteraction]) {
-            self.navBarViews.forEach { $0.transform = offscreen; $0.alpha = 0 }
+        // Reverse stagger: add button leaves first, island bar follows
+        let delays: [Double] = [0, 0.06]
+        for (v, delay) in zip(navBarViews.reversed(), delays) {
+            UIView.animate(withDuration: 0.48, delay: delay, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
+                v.transform = offscreen
+                v.alpha = 0
+            }
         }
     }
 
     private func showBarAnimated() {
         guard isBarHidden else { return }
         isBarHidden = false
-        UIView.animate(withDuration: 0.52, delay: 0.04, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-            self.navBarViews.forEach { $0.transform = .identity; $0.alpha = 1 }
+        // Same spring as viewDidAppear entrance
+        let delays: [Double] = [0.06, 0.12]
+        for (v, delay) in zip(navBarViews, delays) {
+            UIView.animate(withDuration: 0.52, delay: delay, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+                v.transform = .identity
+                v.alpha = 1
+            }
         }
     }
 }
