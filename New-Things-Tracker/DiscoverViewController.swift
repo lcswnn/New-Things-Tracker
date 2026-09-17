@@ -360,7 +360,7 @@ class DiscoverViewController: UIViewController {
             stack.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 14),
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -110),
+            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
         ])
     }
 

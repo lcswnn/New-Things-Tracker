@@ -27,11 +27,17 @@ class ViewController: UIViewController {
     private enum Tab { case home, discover, stats, map }
     private var currentTab: Tab = .home
 
+    // Island bar sits 60pt tall + 16pt gap above safeAreaLayoutGuide.bottomAnchor
+    private let islandClearance: CGFloat = 60 + 16 + 10
+
     private var profileButtonView: UIButton!
     private var mapView: MKMapView!
     private var statsView: UIView!
     private var discoverView: UIView!
-    private var islandBar: UIView!
+    private var discoverVC: DiscoverViewController!
+    private var statsVC: StatsViewController!
+    private var leftIsland: UIView!
+    private var rightIsland: UIView!
     private var tableView: UITableView!
     private var homeButton: UIButton!
     private var discoverButton: UIButton!
@@ -39,6 +45,8 @@ class ViewController: UIViewController {
     private var mapButton: UIButton!
     private var addButton: UIButton!
     private var addButtonContainer: UIView!
+
+    private var navBarViews: [UIView] { [leftIsland, addButtonContainer, rightIsland] }
     private var greetingLabel: UILabel!
     private var dateLabel: UILabel!
     private var esriLabel: UILabel!
@@ -82,28 +90,23 @@ class ViewController: UIViewController {
         setupDiscoverView()
         setupProfileButton()
         setupHeaderLabels()
-        setupIslandBar()
-        setupAddButton()
         setupCardsTable()
         setupHeaderFade()
+        setupNavBar()           // last — stays above all content
 
         // Start off-screen for entrance animation
         let offscreen = CGAffineTransform(translationX: 0, y: 120)
-        islandBar.transform = offscreen
-        islandBar.alpha = 0
-        addButtonContainer.transform = offscreen
-        addButtonContainer.alpha = 0
+        navBarViews.forEach { $0.transform = offscreen; $0.alpha = 0 }
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        UIView.animate(withDuration: 0.52, delay: 0.08, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-            self.islandBar.transform = .identity
-            self.islandBar.alpha = 1
-        }
-        UIView.animate(withDuration: 0.52, delay: 0.14, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-            self.addButtonContainer.transform = .identity
-            self.addButtonContainer.alpha = 1
+        let delays: [Double] = [0.06, 0.12, 0.06]
+        for (view, delay) in zip(navBarViews, delays) {
+            UIView.animate(withDuration: 0.52, delay: delay, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
+                view.transform = .identity
+                view.alpha = 1
+            }
         }
     }
 
@@ -112,6 +115,17 @@ class ViewController: UIViewController {
         if let fadeView = headerFadeView {
             headerFadeLayer.frame = fadeView.bounds
         }
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        // tableView extends to the physical bottom, so include the safe area in its inset
+        tableView.contentInset.bottom = islandClearance + view.safeAreaInsets.bottom
+        // Child VCs get extra safe area so their scroll views auto-inset correctly
+        guard discoverVC != nil, statsVC != nil else { return }
+        let extra = UIEdgeInsets(top: 0, left: 0, bottom: islandClearance, right: 0)
+        discoverVC.additionalSafeAreaInsets = extra
+        statsVC.additionalSafeAreaInsets = extra
     }
 
     private func setupMapView() {
@@ -157,7 +171,7 @@ class ViewController: UIViewController {
     }
 
     private func setupDiscoverView() {
-        let discoverVC = DiscoverViewController()
+        discoverVC = DiscoverViewController()
         addChild(discoverVC)
         discoverView = discoverVC.view
         discoverView.translatesAutoresizingMaskIntoConstraints = false
@@ -174,7 +188,7 @@ class ViewController: UIViewController {
     }
 
     private func setupStatsView() {
-        let statsVC = StatsViewController()
+        statsVC = StatsViewController()
         addChild(statsVC)
         statsView = statsVC.view
         statsView.translatesAutoresizingMaskIntoConstraints = false
@@ -260,11 +274,11 @@ class ViewController: UIViewController {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
-        tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 110, right: 0)
+        tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: islandClearance, right: 0)
         tableView.register(FirstCardCell.self, forCellReuseIdentifier: FirstCardCell.identifier)
         tableView.dataSource = self
         tableView.delegate = self
-        view.insertSubview(tableView, belowSubview: islandBar)
+        view.addSubview(tableView)
 
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 8),
@@ -294,66 +308,18 @@ class ViewController: UIViewController {
         ])
     }
 
-    private func setupIslandBar() {
-        islandBar = UIView()
-        islandBar.translatesAutoresizingMaskIntoConstraints = false
-        islandBar.backgroundColor = UIColor(named: "DeepPineInk")
-        islandBar.layer.cornerRadius = 30
-        islandBar.layer.shadowColor = UIColor.black.cgColor
-        islandBar.layer.shadowOpacity = 0.2
-        islandBar.layer.shadowOffset = CGSize(width: 0, height: 4)
-        islandBar.layer.shadowRadius = 12
-        view.addSubview(islandBar)
-
-        NSLayoutConstraint.activate([
-            islandBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
-            islandBar.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: -33),
-            islandBar.heightAnchor.constraint(equalToConstant: 60),
-            islandBar.widthAnchor.constraint(equalToConstant: 290),
-        ])
-
-        homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
-        discoverButton = makeIslandButton(image: UIImage(named: "icon-navigate"), action: #selector(discoverTapped))
-        statsButton    = makeIslandButton(image: UIImage(named: "icon-chart"),    action: #selector(statsTapped))
-        mapButton      = makeIslandButton(image: UIImage(named: "icon-map"),      action: #selector(mapTapped))
-
-        // Force the discover icon to render at an explicit size so it matches the others
-        discoverButton.contentHorizontalAlignment = .fill
-        discoverButton.contentVerticalAlignment = .fill
-        discoverButton.imageView?.contentMode = .scaleAspectFit
-        NSLayoutConstraint.activate([
-            discoverButton.widthAnchor.constraint(equalToConstant: 29),
-            discoverButton.heightAnchor.constraint(equalToConstant: 29),
-        ])
-
-        let stack = UIStackView(arrangedSubviews: [homeButton, discoverButton, statsButton, mapButton])
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.axis = .horizontal
-        stack.distribution = .equalSpacing
-        stack.alignment = .center
-        islandBar.addSubview(stack)
-
-        updateIslandSelection()
-
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: islandBar.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: -24),
-            stack.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
-        ])
-    }
-
-    private func setupAddButton() {
+    private func setupNavBar() {
+        // ── Center add button ──────────────────────────────────────────
         addButtonContainer = UIView()
         addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
         addButtonContainer.backgroundColor = UIColor(named: "ClayAccent")
-        addButtonContainer.layer.cornerRadius = 27
+        addButtonContainer.layer.cornerRadius = 30
         addButtonContainer.layer.shadowColor = UIColor.black.cgColor
         addButtonContainer.layer.shadowOpacity = 0.2
         addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
         addButtonContainer.layer.shadowRadius = 8
         view.addSubview(addButtonContainer)
 
-        // Button sits on top of the frost view as a sibling — never inside UIVisualEffectView
         addButton = UIButton(type: .system)
         addButton.translatesAutoresizingMaskIntoConstraints = false
         let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 32, weight: .medium))
@@ -365,17 +331,85 @@ class ViewController: UIViewController {
         addButton.addTarget(self, action: #selector(islandButtonPressUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButtonContainer.addSubview(addButton)
 
-        NSLayoutConstraint.activate([
-            addButtonContainer.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
-            addButtonContainer.leadingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: 12),
-            addButtonContainer.widthAnchor.constraint(equalToConstant: 54),
-            addButtonContainer.heightAnchor.constraint(equalToConstant: 54),
+        // ── Left island: Home + Discover ──────────────────────────────
+        leftIsland = makeIslandPill()
+        view.addSubview(leftIsland)
 
+        homeButton     = makeIslandButton(image: UIImage(named: "icon-house"),    action: #selector(homeTapped))
+        discoverButton = makeIslandButton(image: UIImage(named: "icon-navigate"), action: #selector(discoverTapped))
+        discoverButton.contentHorizontalAlignment = .fill
+        discoverButton.contentVerticalAlignment = .fill
+        discoverButton.imageView?.contentMode = .scaleAspectFit
+        NSLayoutConstraint.activate([
+            discoverButton.widthAnchor.constraint(equalToConstant: 29),
+            discoverButton.heightAnchor.constraint(equalToConstant: 29),
+        ])
+
+        let leftStack = UIStackView(arrangedSubviews: [homeButton, discoverButton])
+        leftStack.translatesAutoresizingMaskIntoConstraints = false
+        leftStack.axis = .horizontal
+        leftStack.distribution = .equalSpacing
+        leftStack.alignment = .center
+        leftIsland.addSubview(leftStack)
+
+        // ── Right island: Stats + Map ──────────────────────────────────
+        rightIsland = makeIslandPill()
+        view.addSubview(rightIsland)
+
+        statsButton = makeIslandButton(image: UIImage(named: "icon-chart"), action: #selector(statsTapped))
+        mapButton   = makeIslandButton(image: UIImage(named: "icon-map"),   action: #selector(mapTapped))
+
+        let rightStack = UIStackView(arrangedSubviews: [statsButton, mapButton])
+        rightStack.translatesAutoresizingMaskIntoConstraints = false
+        rightStack.axis = .horizontal
+        rightStack.distribution = .equalSpacing
+        rightStack.alignment = .center
+        rightIsland.addSubview(rightStack)
+
+        // ── Layout ────────────────────────────────────────────────────
+        NSLayoutConstraint.activate([
+            // Add button: perfectly centered, same height as islands
+            addButtonContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            addButtonContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            addButtonContainer.widthAnchor.constraint(equalToConstant: 60),
+            addButtonContainer.heightAnchor.constraint(equalToConstant: 60),
             addButton.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
             addButton.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
             addButton.leadingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor),
             addButton.trailingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor),
+
+            // Left island: leading edge to screen edge, trailing to add button
+            leftIsland.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            leftIsland.trailingAnchor.constraint(equalTo: addButtonContainer.leadingAnchor, constant: -10),
+            leftIsland.centerYAnchor.constraint(equalTo: addButtonContainer.centerYAnchor),
+            leftIsland.heightAnchor.constraint(equalToConstant: 60),
+            leftStack.leadingAnchor.constraint(equalTo: leftIsland.leadingAnchor, constant: 22),
+            leftStack.trailingAnchor.constraint(equalTo: leftIsland.trailingAnchor, constant: -22),
+            leftStack.centerYAnchor.constraint(equalTo: leftIsland.centerYAnchor),
+
+            // Right island: leading from add button, trailing to screen edge
+            rightIsland.leadingAnchor.constraint(equalTo: addButtonContainer.trailingAnchor, constant: 10),
+            rightIsland.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            rightIsland.centerYAnchor.constraint(equalTo: addButtonContainer.centerYAnchor),
+            rightIsland.heightAnchor.constraint(equalToConstant: 60),
+            rightStack.leadingAnchor.constraint(equalTo: rightIsland.leadingAnchor, constant: 22),
+            rightStack.trailingAnchor.constraint(equalTo: rightIsland.trailingAnchor, constant: -22),
+            rightStack.centerYAnchor.constraint(equalTo: rightIsland.centerYAnchor),
         ])
+
+        updateIslandSelection()
+    }
+
+    private func makeIslandPill() -> UIView {
+        let pill = UIView()
+        pill.translatesAutoresizingMaskIntoConstraints = false
+        pill.backgroundColor = UIColor(named: "DeepPineInk")
+        pill.layer.cornerRadius = 30
+        pill.layer.shadowColor = UIColor.black.cgColor
+        pill.layer.shadowOpacity = 0.2
+        pill.layer.shadowOffset = CGSize(width: 0, height: 4)
+        pill.layer.shadowRadius = 12
+        return pill
     }
 
     private func makeIslandButton(image: UIImage?, action: Selector) -> UIButton {
@@ -417,10 +451,7 @@ class ViewController: UIViewController {
 
         if isBarHidden {
             isBarHidden = false
-            islandBar.transform = .identity
-            islandBar.alpha = 1
-            addButtonContainer.transform = .identity
-            addButtonContainer.alpha = 1
+            navBarViews.forEach { $0.transform = .identity; $0.alpha = 1 }
         }
 
         mapView.alpha              = tab == .map      ? 1 : 0
@@ -472,12 +503,7 @@ class ViewController: UIViewController {
         isBarHidden = true
         let offscreen = CGAffineTransform(translationX: 0, y: 120)
         UIView.animate(withDuration: 0.52, delay: 0, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseIn, .allowUserInteraction]) {
-            self.addButtonContainer.transform = offscreen
-            self.addButtonContainer.alpha = 0
-        }
-        UIView.animate(withDuration: 0.52, delay: 0.06, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseIn, .allowUserInteraction]) {
-            self.islandBar.transform = offscreen
-            self.islandBar.alpha = 0
+            self.navBarViews.forEach { $0.transform = offscreen; $0.alpha = 0 }
         }
     }
 
@@ -485,12 +511,7 @@ class ViewController: UIViewController {
         guard isBarHidden else { return }
         isBarHidden = false
         UIView.animate(withDuration: 0.52, delay: 0.04, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-            self.islandBar.transform = .identity
-            self.islandBar.alpha = 1
-        }
-        UIView.animate(withDuration: 0.52, delay: 0.1, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-            self.addButtonContainer.transform = .identity
-            self.addButtonContainer.alpha = 1
+            self.navBarViews.forEach { $0.transform = .identity; $0.alpha = 1 }
         }
     }
 }
