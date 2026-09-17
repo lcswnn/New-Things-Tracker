@@ -53,6 +53,7 @@ class ViewController: UIViewController {
     private weak var headerFadeView: UIView?
     private var isBarHidden = false
     private var isMapMoving = false
+    private var profileImage: UIImage?
 
     override var prefersStatusBarHidden: Bool { true }
 
@@ -451,7 +452,30 @@ class ViewController: UIViewController {
     }
 
     @objc func profileTapped() {
-        print("Profile tapped")
+        let profileVC = ProfileViewController()
+        profileVC.delegate = self
+        profileVC.initialImage = profileImage
+        profileVC.modalPresentationStyle = .pageSheet
+        if let sheet = profileVC.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(profileVC, animated: true)
+    }
+
+    private func applyProfilePhoto(_ image: UIImage) {
+        profileImage = image
+        let size = CGSize(width: 40, height: 40)
+        let circular = UIGraphicsImageRenderer(size: size).image { ctx in
+            UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }.withRenderingMode(.alwaysOriginal)
+        profileButtonView.setImage(circular, for: .normal)
+        profileButtonView.imageView?.layer.cornerRadius = 20
+        profileButtonView.imageView?.clipsToBounds = true
+        profileButtonView.layer.cornerRadius = 20
+        profileButtonView.clipsToBounds = true
     }
 
     @objc func addEventTapped() {
@@ -536,6 +560,12 @@ class ViewController: UIViewController {
                 v.alpha = 1
             }
         }
+    }
+}
+
+extension ViewController: ProfileViewControllerDelegate {
+    func profileViewController(_ vc: ProfileViewController, didUpdatePhoto image: UIImage) {
+        applyProfilePhoto(image)
     }
 }
 
