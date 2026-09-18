@@ -10,19 +10,6 @@ import MapKit
 import SwiftUI
 import Combine
 
-// Esri tile URLs use level/row/column order rather than the standard z/x/y
-private class EsriLightGrayTileOverlay: MKTileOverlay {
-    override func url(forTilePath path: MKTileOverlayPath) -> URL {
-        URL(string: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/\(path.z)/\(path.y)/\(path.x)")!
-    }
-}
-
-// Reference layer adds roads, boundaries, and labels on top of the base
-private class EsriLightGrayReferenceOverlay: MKTileOverlay {
-    override func url(forTilePath path: MKTileOverlayPath) -> URL {
-        URL(string: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/\(path.z)/\(path.y)/\(path.x)")!
-    }
-}
 
 class ViewController: UIViewController {
 
@@ -51,7 +38,6 @@ class ViewController: UIViewController {
     private var navBarViews: [UIView] { [islandBar, addButtonContainer] }
     private var greetingLabel: UILabel!
     private var dateLabel: UILabel!
-    private var esriLabel: UILabel!
     private weak var headerFadeView: UIView?
     private var isBarHidden = false
     private var isMapMoving = false
@@ -95,6 +81,7 @@ class ViewController: UIViewController {
         navigationController?.navigationBar.isHidden = true
 
         setupMapView()
+        prewarmMapRegion()
         setupStatsView()
         setupDiscoverView()
         setupProfileButton()
@@ -146,43 +133,42 @@ class ViewController: UIViewController {
     private func setupMapView() {
         mapView = MKMapView()
         mapView.translatesAutoresizingMaskIntoConstraints = false
-        mapView.alpha = 0
+        mapView.alpha = 0.001          // non-zero so MapKit loads tiles in the background
+        mapView.isUserInteractionEnabled = false
         mapView.delegate = self
         mapView.showsCompass = false
         mapView.showsScale = false
 
-        // Esri World Light Gray — base layer (terrain, water, land)
-        let tileOverlay = EsriLightGrayTileOverlay()
-        tileOverlay.canReplaceMapContent = true
-        mapView.addOverlay(tileOverlay, level: .aboveLabels)
-
-        // Reference layer adds roads, borders, and place outlines on top
-        let referenceOverlay = EsriLightGrayReferenceOverlay()
-        referenceOverlay.canReplaceMapContent = false
-        mapView.addOverlay(referenceOverlay, level: .aboveLabels)
+        // Muted standard style — clean, low-distraction, loads instantly from system cache
+        let config = MKStandardMapConfiguration(emphasisStyle: .muted)
+        config.showsTraffic = false
+        config.pointOfInterestFilter = .excludingAll
+        mapView.preferredConfiguration = config
 
         let mapTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMapTap(_:)))
         mapView.addGestureRecognizer(mapTapGesture)
 
         view.addSubview(mapView)
 
-        esriLabel = UILabel()
-        esriLabel.translatesAutoresizingMaskIntoConstraints = false
-        esriLabel.text = "Powered by Esri"
-        esriLabel.font = UIFont.karla(.regular, size: 10)
-        esriLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.4)
-        esriLabel.isHidden = true
-        view.addSubview(esriLabel)
-
         NSLayoutConstraint.activate([
             mapView.topAnchor.constraint(equalTo: view.topAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-
-            esriLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            esriLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -26),
         ])
+    }
+
+    // Sets the map's initial region from the saved home coordinate so tiles at the
+    // user's local zoom level start loading before they ever tap the map tab.
+    private func prewarmMapRegion() {
+        let lat = UserDefaults.standard.double(forKey: "homeLatitude")
+        let lon = UserDefaults.standard.double(forKey: "homeLongitude")
+        guard lat != 0 || lon != 0 else { return }
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            latitudinalMeters: 15_000, longitudinalMeters: 15_000
+        )
+        mapView.setRegion(region, animated: false)
     }
 
     private func setupDiscoverView() {
@@ -518,14 +504,14 @@ class ViewController: UIViewController {
             navBarViews.forEach { $0.transform = .identity; $0.alpha = 1 }
         }
 
-        mapView.alpha              = tab == .map      ? 1 : 0
+        mapView.alpha                    = tab == .map ? 1.0 : 0.001
+        mapView.isUserInteractionEnabled = tab == .map
         statsView.isHidden         = tab != .stats
         discoverView.isHidden      = tab != .discover
         tableView.isHidden         = tab != .home
         profileButtonView.isHidden = tab != .home
         greetingLabel.isHidden     = tab != .home
         dateLabel.isHidden         = tab != .home
-        esriLabel.isHidden         = tab != .map
         headerFadeView?.isHidden   = tab != .home
 
         updateIslandSelection()
@@ -836,13 +822,6 @@ extension ViewController: ProfileViewControllerDelegate {
 }
 
 extension ViewController: MKMapViewDelegate {
-    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-        if let tileOverlay = overlay as? MKTileOverlay {
-            return MKTileOverlayRenderer(tileOverlay: tileOverlay)
-        }
-        return MKOverlayRenderer(overlay: overlay)
-    }
-
     func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
         guard currentTab == .map else { return }
         isMapMoving = true
