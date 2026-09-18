@@ -64,6 +64,10 @@ class ViewController: UIViewController {
     private var hasRequestedPermissions = false
     private var sections: [(month: String, firsts: [First])] = []
     private var candidatesBySection: [[PlaceCandidate]] = []
+    private var pendingCandidates: [PlaceCandidate] = []
+    private weak var statsTotalLabel: UILabel?
+    private weak var statsMonthLabel: UILabel?
+    private weak var statsStreakLabel: UILabel?
 
     // Cycles through these colors for card backgrounds while real photos aren't shown
     private let cardColors: [(UIColor, UIColor)] = [
@@ -295,6 +299,7 @@ class ViewController: UIViewController {
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        buildAndAttachStatsHeader()
     }
 
     private func setupHeaderLine() {
@@ -472,6 +477,7 @@ class ViewController: UIViewController {
         let profileVC = ProfileViewController()
         profileVC.delegate = self
         profileVC.initialImage = profileImage
+        profileVC.placeCandidates = photoManager.placeCandidates
         profileVC.modalPresentationStyle = .pageSheet
         if let sheet = profileVC.sheetPresentationController {
             sheet.detents = [.large()]
@@ -484,9 +490,13 @@ class ViewController: UIViewController {
     private func applyProfilePhoto(_ image: UIImage) {
         profileImage = image
         let size = CGSize(width: 40, height: 40)
-        let circular = UIGraphicsImageRenderer(size: size).image { ctx in
+        let circular = UIGraphicsImageRenderer(size: size).image { _ in
+            // Aspect-fill: scale so the shorter dimension fills the target, center-crop the longer one
+            let scale  = max(size.width / image.size.width, size.height / image.size.height)
+            let drawn  = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let origin = CGPoint(x: (size.width - drawn.width) / 2, y: (size.height - drawn.height) / 2)
             UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
-            image.draw(in: CGRect(origin: .zero, size: size))
+            image.draw(in: CGRect(origin: origin, size: drawn))
         }.withRenderingMode(.alwaysOriginal)
         profileButtonView.setImage(circular, for: .normal)
         profileButtonView.imageView?.layer.cornerRadius = 20
@@ -579,14 +589,180 @@ class ViewController: UIViewController {
         }
     }
 
+    // MARK: - Stats header
+
+    private func buildAndAttachStatsHeader() {
+        let container = UIView()
+        container.backgroundColor = .clear
+        container.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 84)
+
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.13)
+        card.layer.cornerRadius = 16
+        container.addSubview(card)
+
+        func makeTile(value: String, caption: String) -> (UIView, UILabel) {
+            let tile = UIView()
+            tile.translatesAutoresizingMaskIntoConstraints = false
+            let vLabel = UILabel()
+            vLabel.translatesAutoresizingMaskIntoConstraints = false
+            vLabel.text = value
+            vLabel.font = UIFont.fraunces(.bold, size: 24)
+            vLabel.textColor = UIColor(named: "FogBackground")
+            vLabel.textAlignment = .center
+            let nLabel = UILabel()
+            nLabel.translatesAutoresizingMaskIntoConstraints = false
+            nLabel.text = caption
+            nLabel.font = UIFont.karla(.regular, size: 11)
+            nLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.52)
+            nLabel.textAlignment = .center
+            tile.addSubview(vLabel)
+            tile.addSubview(nLabel)
+            NSLayoutConstraint.activate([
+                vLabel.topAnchor.constraint(equalTo: tile.topAnchor),
+                vLabel.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
+                nLabel.topAnchor.constraint(equalTo: vLabel.bottomAnchor, constant: 2),
+                nLabel.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
+                nLabel.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
+            ])
+            return (tile, vLabel)
+        }
+
+        let (totalTile, totalVal)  = makeTile(value: "—", caption: "total firsts")
+        let (monthTile, monthVal)  = makeTile(value: "—", caption: "this month")
+        let (streakTile, streakVal) = makeTile(value: "—", caption: "month streak")
+        statsTotalLabel  = totalVal
+        statsMonthLabel  = monthVal
+        statsStreakLabel = streakVal
+
+        let stack = UIStackView(arrangedSubviews: [totalTile, monthTile, streakTile])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.distribution = .fillEqually
+        stack.spacing = 0
+        card.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            card.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
+            card.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            card.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+        ])
+
+        tableView.tableHeaderView = container
+    }
+
+    // MARK: - Review queue helpers
+
+    private func centroidKey(_ coord: CLLocationCoordinate2D) -> String {
+        "place_\(String(format: "%.3f", coord.latitude))_\(String(format: "%.3f", coord.longitude))"
+    }
+
+    private var reviewedPlaceKeys: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "reviewedPlaceKeys") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "reviewedPlaceKeys") }
+    }
+
+    private var reviewSectionOffset: Int { pendingCandidates.isEmpty ? 0 : 1 }
+
+    private func monthStreak(from candidates: [PlaceCandidate]) -> Int {
+        guard !candidates.isEmpty else { return 0 }
+        let calendar = Calendar.current
+        var comps = calendar.dateComponents([.year, .month], from: Date())
+        var streak = 0
+        for _ in 0..<24 {
+            let hasPlace = candidates.contains { c in
+                let cc = calendar.dateComponents([.year, .month], from: c.firstVisitDate)
+                return cc.year == comps.year && cc.month == comps.month
+            }
+            if hasPlace {
+                streak += 1
+                comps.month! -= 1
+            } else { break }
+        }
+        return streak
+    }
+
+    private func updateStatsHeader(candidates: [PlaceCandidate]) {
+        let calendar = Calendar.current
+        let thisComps = calendar.dateComponents([.year, .month], from: Date())
+        let thisMonthCount = candidates.filter {
+            let c = calendar.dateComponents([.year, .month], from: $0.firstVisitDate)
+            return c.year == thisComps.year && c.month == thisComps.month
+        }.count
+        let streak = monthStreak(from: candidates)
+        statsTotalLabel?.text  = candidates.isEmpty ? "—" : "\(candidates.count)"
+        statsMonthLabel?.text  = "\(thisMonthCount)"
+        statsStreakLabel?.text = "\(max(streak, 0))"
+    }
+
+    private func makeHeaderView(_ text: String) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.attributedText = NSAttributedString(string: text, attributes: [
+            .font: UIFont.karla(.semibold, size: 12),
+            .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
+            .kern: 1.5,
+        ])
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+        ])
+        return container
+    }
+
+    private func showReviewAlert(for candidate: PlaceCandidate) {
+        let name = candidate.placeName ?? "this place"
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        let sheet = UIAlertController(
+            title: "Was this a first?",
+            message: "You visited \(name) on \(formatter.string(from: candidate.firstVisitDate)).",
+            preferredStyle: .actionSheet
+        )
+        sheet.addAction(UIAlertAction(title: "Yes — it's a first!", style: .default) { [weak self] _ in
+            self?.markReviewed(candidate)
+        })
+        sheet.addAction(UIAlertAction(title: "No, I've been here before", style: .default) { [weak self] _ in
+            self?.markReviewed(candidate)
+        })
+        sheet.addAction(UIAlertAction(title: "Ask me later", style: .cancel))
+        present(sheet, animated: true)
+    }
+
+    private func markReviewed(_ candidate: PlaceCandidate) {
+        var keys = reviewedPlaceKeys
+        keys.insert(centroidKey(candidate.centroid))
+        reviewedPlaceKeys = keys
+        pendingCandidates.removeAll { centroidKey($0.centroid) == centroidKey(candidate.centroid) }
+        tableView.reloadData()
+    }
+
     // MARK: - Home feed
 
     private func rebuildSections() {
         let candidates = photoManager.placeCandidates
+
+        updateStatsHeader(candidates: candidates)
+
+        let reviewed = reviewedPlaceKeys
+        pendingCandidates = Array(candidates.filter { c in
+            c.visitCount == 1 && !reviewed.contains(centroidKey(c.centroid))
+        }.prefix(5))
+
         guard !candidates.isEmpty else {
-            if !sections.isEmpty {
-                sections = []; candidatesBySection = []; tableView.reloadData()
-            }
+            sections = []; candidatesBySection = []
+            tableView.reloadData()
             return
         }
 
@@ -681,45 +857,47 @@ extension ViewController: MKMapViewDelegate {
 extension ViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        sections.count
+        sections.count + reviewSectionOffset
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        sections[section].firsts.count
+        if section == 0 && !pendingCandidates.isEmpty { return pendingCandidates.count }
+        return sections[section - reviewSectionOffset].firsts.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.section == 0 && !pendingCandidates.isEmpty {
+            let cell = tableView.dequeueReusableCell(withIdentifier: ReviewQueueCell.identifier, for: indexPath) as! ReviewQueueCell
+            let c = pendingCandidates[indexPath.row]
+            cell.configure(with: ReviewItem(
+                label: c.placeName ?? "Somewhere new",
+                date: cardDateFormatter.string(from: c.firstVisitDate),
+                reason: "\(c.totalPhotoCount) photo\(c.totalPhotoCount == 1 ? "" : "s")"
+            ))
+            return cell
+        }
         let cell = tableView.dequeueReusableCell(withIdentifier: FirstCardCell.identifier, for: indexPath) as! FirstCardCell
-        cell.configure(with: sections[indexPath.section].firsts[indexPath.row])
+        cell.configure(with: sections[indexPath.section - reviewSectionOffset].firsts[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        let container = UIView()
-        container.backgroundColor = .clear
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.attributedText = NSAttributedString(string: sections[section].month, attributes: [
-            .font: UIFont.karla(.semibold, size: 12),
-            .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
-            .kern: 1.5,
-        ])
-        container.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
-        ])
-        return container
+        if section == 0 && !pendingCandidates.isEmpty { return makeHeaderView("NEEDS YOUR INPUT") }
+        return makeHeaderView(sections[section - reviewSectionOffset].month)
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 36 }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard indexPath.section < candidatesBySection.count,
-              indexPath.row < candidatesBySection[indexPath.section].count else { return }
-        let candidate = candidatesBySection[indexPath.section][indexPath.row]
+        if indexPath.section == 0 && !pendingCandidates.isEmpty {
+            showReviewAlert(for: pendingCandidates[indexPath.row])
+            return
+        }
+        let s = indexPath.section - reviewSectionOffset
+        guard s < candidatesBySection.count,
+              indexPath.row < candidatesBySection[s].count else { return }
+        let candidate = candidatesBySection[s][indexPath.row]
         let detailVC = PlaceDetailViewController(candidate: candidate)
         detailVC.modalPresentationStyle = .pageSheet
         if let sheet = detailVC.sheetPresentationController {

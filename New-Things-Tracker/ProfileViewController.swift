@@ -15,19 +15,19 @@ class ProfileViewController: UIViewController {
     private let scrollView  = UIScrollView()
     private let contentView = UIView()
     private let photoImageView = UIImageView()
-    private var homeAddressLabel: UILabel!
-    private var homeSetButton: UIButton!
-    private let homeLocationManager = CLLocationManager()
+    private var locationsSubtitleLabel: UILabel!
 
-    private let gridItems: [(title: String, category: String, color: UIColor)] = [
-        ("Randolph Street Market",     "Festival",      UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1)),
-        ("Hot Air Balloon Ride",       "Adventure",     UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1)),
-        ("First Jazz Concert",         "Music",         UIColor(red: 0.56, green: 0.65, blue: 0.76, alpha: 1)),
-        ("Drive-In Movie Night",       "Entertainment", UIColor(red: 0.82, green: 0.70, blue: 0.62, alpha: 1)),
-        ("Green Mill Cocktail Lounge", "Music",         UIColor(red: 0.65, green: 0.72, blue: 0.85, alpha: 1)),
-        ("Lou Mitchell's Diner",       "Food",          UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1)),
-        ("Millennium Park Run",        "Fitness",       UIColor(red: 0.76, green: 0.88, blue: 0.80, alpha: 1)),
-        ("Chicago Architecture Tour",  "Culture",       UIColor(red: 0.82, green: 0.78, blue: 0.90, alpha: 1)),
+    var placeCandidates: [PlaceCandidate] = []
+
+    private let gridColors: [UIColor] = [
+        UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1),
+        UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1),
+        UIColor(red: 0.56, green: 0.65, blue: 0.76, alpha: 1),
+        UIColor(red: 0.82, green: 0.70, blue: 0.62, alpha: 1),
+        UIColor(red: 0.65, green: 0.72, blue: 0.85, alpha: 1),
+        UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1),
+        UIColor(red: 0.76, green: 0.88, blue: 0.80, alpha: 1),
+        UIColor(red: 0.82, green: 0.78, blue: 0.90, alpha: 1),
     ]
 
     override func viewDidLoad() {
@@ -86,14 +86,13 @@ class ProfileViewController: UIViewController {
         photoRing.layer.cornerRadius = 48
         photoRing.layer.borderWidth  = 1.5
         photoRing.layer.borderColor  = UIColor(named: "FogBackground")?.withAlphaComponent(0.22).cgColor
+        photoRing.clipsToBounds      = true
         photoRing.isUserInteractionEnabled = true
         photoRing.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(photoTapped)))
         contentView.addSubview(photoRing)
 
         photoImageView.translatesAutoresizingMaskIntoConstraints = false
-        photoImageView.contentMode   = .scaleAspectFill
-        photoImageView.clipsToBounds = true
-        photoImageView.layer.cornerRadius = 46
+        photoImageView.contentMode = .scaleAspectFill
         photoRing.addSubview(photoImageView)
 
         // — Camera badge —
@@ -166,9 +165,9 @@ class ProfileViewController: UIViewController {
         let grid = buildGrid()
         contentView.addSubview(grid)
 
-        // — Home location —
-        let homeCard = buildHomeCard()
-        contentView.addSubview(homeCard)
+        // — Locations card —
+        let locationsCard = buildLocationsCard()
+        contentView.addSubview(locationsCard)
 
         NSLayoutConstraint.activate([
             // close
@@ -183,10 +182,10 @@ class ProfileViewController: UIViewController {
             photoRing.widthAnchor.constraint(equalToConstant: 96),
             photoRing.heightAnchor.constraint(equalToConstant: 96),
 
-            photoImageView.topAnchor.constraint(equalTo: photoRing.topAnchor, constant: 1),
-            photoImageView.bottomAnchor.constraint(equalTo: photoRing.bottomAnchor, constant: -1),
-            photoImageView.leadingAnchor.constraint(equalTo: photoRing.leadingAnchor, constant: 1),
-            photoImageView.trailingAnchor.constraint(equalTo: photoRing.trailingAnchor, constant: -1),
+            photoImageView.topAnchor.constraint(equalTo: photoRing.topAnchor),
+            photoImageView.bottomAnchor.constraint(equalTo: photoRing.bottomAnchor),
+            photoImageView.leadingAnchor.constraint(equalTo: photoRing.leadingAnchor),
+            photoImageView.trailingAnchor.constraint(equalTo: photoRing.trailingAnchor),
 
             // badge
             badge.trailingAnchor.constraint(equalTo: photoRing.trailingAnchor, constant: 4),
@@ -216,13 +215,13 @@ class ProfileViewController: UIViewController {
             statsStack.topAnchor.constraint(equalTo: editHint.bottomAnchor, constant: 26),
             statsStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-            // home card
-            homeCard.topAnchor.constraint(equalTo: statsStack.bottomAnchor, constant: 20),
-            homeCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            homeCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            // locations card
+            locationsCard.topAnchor.constraint(equalTo: statsStack.bottomAnchor, constant: 20),
+            locationsCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            locationsCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
 
             // divider
-            divider.topAnchor.constraint(equalTo: homeCard.bottomAnchor, constant: 16),
+            divider.topAnchor.constraint(equalTo: locationsCard.bottomAnchor, constant: 16),
             divider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             divider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             divider.heightAnchor.constraint(equalToConstant: 0.5),
@@ -240,13 +239,18 @@ class ProfileViewController: UIViewController {
     }
 
     private func makeStatsRow() -> UIStackView {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let thisYearCount = placeCandidates.filter {
+            Calendar.current.component(.year, from: $0.firstVisitDate) == currentYear
+        }.count
+
         let stack = UIStackView()
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis      = .horizontal
         stack.spacing   = 36
         stack.alignment = .center
 
-        for (value, label) in [("47", "Firsts"), ("12", "This Year"), ("8", "Countries")] {
+        for (value, label) in [("\(placeCandidates.count)", "Firsts"), ("\(thisYearCount)", "This Year"), ("—", "Countries")] {
             let col = UIStackView()
             col.axis      = .vertical
             col.alignment = .center
@@ -269,89 +273,121 @@ class ProfileViewController: UIViewController {
         return stack
     }
 
-    // MARK: - Home card
+    // MARK: - Locations card
 
-    private func buildHomeCard() -> UIView {
+    private func buildLocationsCard() -> UIView {
         let card = UIView()
         card.translatesAutoresizingMaskIntoConstraints = false
         card.backgroundColor    = UIColor(named: "FogBackground")?.withAlphaComponent(0.10)
         card.layer.cornerRadius = 14
         card.layer.borderWidth  = 0.5
         card.layer.borderColor  = UIColor(named: "FogBackground")?.withAlphaComponent(0.18).cgColor
+        card.isUserInteractionEnabled = true
+        card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(locationsTapped)))
 
-        let houseIcon = UIImageView(image: UIImage(systemName: "house.fill",
+        let pinIcon = UIImageView(image: UIImage(systemName: "mappin.and.ellipse",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)))
-        houseIcon.translatesAutoresizingMaskIntoConstraints = false
-        houseIcon.tintColor   = UIColor(named: "ClayAccent")
-        houseIcon.contentMode = .scaleAspectFit
-        card.addSubview(houseIcon)
+        pinIcon.translatesAutoresizingMaskIntoConstraints = false
+        pinIcon.tintColor   = UIColor(named: "ClayAccent")
+        pinIcon.contentMode = .scaleAspectFit
+        card.addSubview(pinIcon)
 
         let titleLabel = UILabel()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text      = "Home Location"
+        titleLabel.text      = "Locations"
         titleLabel.font      = .karla(.semibold, size: 13)
         titleLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.80)
         card.addSubview(titleLabel)
 
-        homeAddressLabel = UILabel()
-        homeAddressLabel.translatesAutoresizingMaskIntoConstraints = false
-        let savedName = UserDefaults.standard.string(forKey: "homeAddressName")
-        homeAddressLabel.text = savedName ?? "Not set"
-        homeAddressLabel.font = .karla(.regular, size: 12)
-        homeAddressLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.48)
-        homeAddressLabel.numberOfLines = 2
-        card.addSubview(homeAddressLabel)
+        locationsSubtitleLabel = UILabel()
+        locationsSubtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        locationsSubtitleLabel.text          = locationsSubtitle()
+        locationsSubtitleLabel.font          = .karla(.regular, size: 12)
+        locationsSubtitleLabel.textColor     = UIColor(named: "FogBackground")?.withAlphaComponent(0.48)
+        locationsSubtitleLabel.numberOfLines = 1
+        card.addSubview(locationsSubtitleLabel)
 
-        homeSetButton = UIButton(type: .system)
-        homeSetButton.translatesAutoresizingMaskIntoConstraints = false
-        homeSetButton.setTitle(savedName != nil ? "Change" : "Set", for: .normal)
-        homeSetButton.titleLabel?.font = .karla(.semibold, size: 13)
-        homeSetButton.tintColor = UIColor(named: "ClayAccent")
-        homeSetButton.addTarget(self, action: #selector(setHomeTapped), for: .touchUpInside)
-        card.addSubview(homeSetButton)
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium)))
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        chevron.tintColor   = UIColor(named: "FogBackground")?.withAlphaComponent(0.30)
+        chevron.contentMode = .scaleAspectFit
+        card.addSubview(chevron)
 
         NSLayoutConstraint.activate([
-            houseIcon.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
-            houseIcon.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
-            houseIcon.widthAnchor.constraint(equalToConstant: 18),
-            houseIcon.heightAnchor.constraint(equalToConstant: 18),
+            pinIcon.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            pinIcon.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            pinIcon.widthAnchor.constraint(equalToConstant: 18),
+            pinIcon.heightAnchor.constraint(equalToConstant: 18),
 
-            titleLabel.leadingAnchor.constraint(equalTo: houseIcon.trailingAnchor, constant: 10),
+            titleLabel.leadingAnchor.constraint(equalTo: pinIcon.trailingAnchor, constant: 10),
             titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: homeSetButton.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
 
-            homeAddressLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            homeAddressLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
-            homeAddressLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
-            homeAddressLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            locationsSubtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            locationsSubtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            locationsSubtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            locationsSubtitleLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
 
-            homeSetButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
-            homeSetButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            chevron.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            chevron.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 12),
         ])
 
         return card
     }
 
+    private func locationsSubtitle() -> String {
+        let all = SavedLocation.loadAll()
+        let setNames = all.filter { $0.isSet }.map { $0.label }
+        return setNames.isEmpty ? "Tap to manage" : setNames.joined(separator: " · ")
+    }
+
+    private func updateLocationsCard() {
+        locationsSubtitleLabel?.text = locationsSubtitle()
+    }
+
     // MARK: - Grid
 
-    private func buildGrid() -> UIStackView {
+    private func buildGrid() -> UIView {
+        if placeCandidates.isEmpty {
+            let wrapper = UIView()
+            wrapper.translatesAutoresizingMaskIntoConstraints = false
+            let label = UILabel()
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.text          = "No places tracked yet.\nExplore somewhere new!"
+            label.font          = .karla(.regular, size: 14)
+            label.textColor     = UIColor(named: "FogBackground")?.withAlphaComponent(0.40)
+            label.textAlignment = .center
+            label.numberOfLines = 0
+            wrapper.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
+                label.topAnchor.constraint(equalTo: wrapper.topAnchor, constant: 24),
+                label.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+                label.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+                label.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor, constant: -24),
+            ])
+            return wrapper
+        }
+
         let vStack = UIStackView()
         vStack.translatesAutoresizingMaskIntoConstraints = false
         vStack.axis    = .vertical
         vStack.spacing = 10
 
         var i = 0
-        while i < gridItems.count {
+        while i < placeCandidates.count {
             let row = UIStackView()
             row.axis         = .horizontal
             row.spacing      = 10
             row.distribution = .fillEqually
             row.heightAnchor.constraint(equalToConstant: 148).isActive = true
 
-            row.addArrangedSubview(makeGridCell(gridItems[i]))
+            row.addArrangedSubview(makeGridCell(placeCandidates[i], color: gridColors[i % gridColors.count]))
 
-            if i + 1 < gridItems.count {
-                row.addArrangedSubview(makeGridCell(gridItems[i + 1]))
+            if i + 1 < placeCandidates.count {
+                row.addArrangedSubview(makeGridCell(placeCandidates[i + 1], color: gridColors[(i + 1) % gridColors.count]))
             } else {
                 row.addArrangedSubview(UIView())
             }
@@ -362,21 +398,21 @@ class ProfileViewController: UIViewController {
         return vStack
     }
 
-    private func makeGridCell(_ item: (title: String, category: String, color: UIColor)) -> UIView {
+    private func makeGridCell(_ candidate: PlaceCandidate, color: UIColor) -> UIView {
         let card = UIView()
-        card.backgroundColor    = item.color
+        card.backgroundColor    = color
         card.layer.cornerRadius = 16
         card.clipsToBounds      = true
 
-        // Bottom scrim so text is always legible
         let scrim = UIView()
         scrim.translatesAutoresizingMaskIntoConstraints = false
         scrim.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.40)
         card.addSubview(scrim)
 
+        let visitText = "\(candidate.visitCount) visit\(candidate.visitCount == 1 ? "" : "s")".uppercased()
         let catLabel = UILabel()
         catLabel.translatesAutoresizingMaskIntoConstraints = false
-        catLabel.attributedText = NSAttributedString(string: item.category.uppercased(), attributes: [
+        catLabel.attributedText = NSAttributedString(string: visitText, attributes: [
             .font: UIFont.karla(.semibold, size: 9),
             .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.72) ?? UIColor.white,
             .kern: 0.8,
@@ -385,7 +421,7 @@ class ProfileViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text          = item.title
+        titleLabel.text          = candidate.placeName ?? "…"
         titleLabel.font          = .fraunces(.regular, size: 14)
         titleLabel.textColor     = UIColor(named: "FogBackground")
         titleLabel.numberOfLines = 2
@@ -415,7 +451,7 @@ class ProfileViewController: UIViewController {
     }
 
     @objc private func photoTapped() {
-        var config = PHPickerConfiguration()
+        var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter         = .images
         config.selectionLimit = 1
         let picker = PHPickerViewController(configuration: config)
@@ -423,26 +459,16 @@ class ProfileViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    @objc private func setHomeTapped() {
-        homeLocationManager.delegate = self
-        let status = homeLocationManager.authorizationStatus
-        switch status {
-        case .authorizedAlways, .authorizedWhenInUse:
-            homeAddressLabel.text = "Locating…"
-            homeLocationManager.requestLocation()
-        case .notDetermined:
-            homeLocationManager.requestWhenInUseAuthorization()
-        case .denied, .restricted:
-            let alert = UIAlertController(
-                title: "Location Access Required",
-                message: "Go to Settings › Privacy › Location Services to enable location for this app.",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            present(alert, animated: true)
-        @unknown default:
-            homeLocationManager.requestWhenInUseAuthorization()
+    @objc private func locationsTapped() {
+        let locVC = LocationsViewController()
+        locVC.delegate = self
+        locVC.modalPresentationStyle = .pageSheet
+        if let sheet = locVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
         }
+        present(locVC, animated: true)
     }
 
     @objc private func bioTapped() {
@@ -458,42 +484,11 @@ class ProfileViewController: UIViewController {
     }
 }
 
-// MARK: - CLLocationManagerDelegate
+// MARK: - LocationsViewControllerDelegate
 
-extension ProfileViewController: CLLocationManagerDelegate {
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard manager === homeLocationManager else { return }
-        let status = manager.authorizationStatus
-        if status == .authorizedAlways || status == .authorizedWhenInUse {
-            homeAddressLabel.text = "Locating…"
-            manager.requestLocation()
-        }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard manager === homeLocationManager, let loc = locations.first else { return }
-        UserDefaults.standard.set(loc.coordinate.latitude,  forKey: "homeLatitude")
-        UserDefaults.standard.set(loc.coordinate.longitude, forKey: "homeLongitude")
-
-        Task { @MainActor in
-            if let request = MKReverseGeocodingRequest(location: loc),
-               let mapItem = (try? await request.mapItems)?.first {
-                let name = mapItem.name ?? mapItem.address?.shortAddress ?? "Home"
-                UserDefaults.standard.set(name, forKey: "homeAddressName")
-                self.homeAddressLabel.text = name
-            } else {
-                let fallback = String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
-                UserDefaults.standard.set(fallback, forKey: "homeAddressName")
-                self.homeAddressLabel.text = fallback
-            }
-            self.homeSetButton.setTitle("Change", for: .normal)
-        }
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard manager === homeLocationManager else { return }
-        homeAddressLabel.text = "Failed — try again"
+extension ProfileViewController: LocationsViewControllerDelegate {
+    func locationsDidUpdate() {
+        updateLocationsCard()
     }
 }
 
@@ -503,6 +498,33 @@ extension ProfileViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
         guard let result = results.first else { return }
+
+        // PHImageManager with .aspectFill gives a pre-cropped square image, avoiding
+        // EXIF orientation issues that cause squishing on real devices.
+        if let identifier = result.assetIdentifier {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+            if let asset = assets.firstObject {
+                let opts = PHImageRequestOptions()
+                opts.deliveryMode          = .highQualityFormat
+                opts.isNetworkAccessAllowed = true
+                PHImageManager.default().requestImage(
+                    for: asset,
+                    targetSize: CGSize(width: 400, height: 400),
+                    contentMode: .aspectFill,
+                    options: opts
+                ) { [weak self] image, info in
+                    guard let self, let image,
+                          (info?[PHImageResultIsDegradedKey] as? Bool) != true else { return }
+                    DispatchQueue.main.async {
+                        self.photoImageView.image = image
+                        self.delegate?.profileViewController(self, didUpdatePhoto: image)
+                    }
+                }
+                return
+            }
+        }
+
+        // Fallback if no asset identifier (e.g. iCloud-only photo)
         result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] obj, _ in
             guard let self, let image = obj as? UIImage else { return }
             DispatchQueue.main.async {
