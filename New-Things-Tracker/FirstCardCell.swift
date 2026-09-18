@@ -1,4 +1,5 @@
 import UIKit
+import Photos
 
 extension UIFont {
     // Fraunces — serif display font for titles and headers
@@ -35,6 +36,7 @@ struct First {
     let extraPhotos: Int
     let largePhotoColor: UIColor
     let smallPhotoColor: UIColor
+    let photoLocalIDs: [String]
 }
 
 class FirstCardCell: UITableViewCell {
@@ -52,6 +54,12 @@ class FirstCardCell: UITableViewCell {
     private let dateLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+
+    // Actual photo thumbnails layered on top of the color placeholders
+    private let largeImageView = UIImageView()
+    private let smallImageView = UIImageView()
+    private var largeRequestID: PHImageRequestID?
+    private var smallRequestID: PHImageRequestID?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -95,6 +103,11 @@ class FirstCardCell: UITableViewCell {
         largePhotoLabel.textAlignment = .center
         largePhotoView.addSubview(largePhotoLabel)
 
+        largeImageView.translatesAutoresizingMaskIntoConstraints = false
+        largeImageView.contentMode = .scaleAspectFill
+        largeImageView.clipsToBounds = true
+        largePhotoView.addSubview(largeImageView)
+
         let rightColumn = UIView()
         rightColumn.translatesAutoresizingMaskIntoConstraints = false
         photoSection.addSubview(rightColumn)
@@ -108,6 +121,11 @@ class FirstCardCell: UITableViewCell {
         smallPhotoLabel.textColor = UIColor.black.withAlphaComponent(0.25)
         smallPhotoLabel.textAlignment = .center
         smallPhotoView.addSubview(smallPhotoLabel)
+
+        smallImageView.translatesAutoresizingMaskIntoConstraints = false
+        smallImageView.contentMode = .scaleAspectFill
+        smallImageView.clipsToBounds = true
+        smallPhotoView.addSubview(smallImageView)
 
         extraCountContainer.translatesAutoresizingMaskIntoConstraints = false
         extraCountContainer.backgroundColor = UIColor.black.withAlphaComponent(0.06)
@@ -161,6 +179,11 @@ class FirstCardCell: UITableViewCell {
             largePhotoView.leadingAnchor.constraint(equalTo: photoSection.leadingAnchor),
             largePhotoView.trailingAnchor.constraint(equalTo: rightColumn.leadingAnchor, constant: -2),
 
+            largeImageView.topAnchor.constraint(equalTo: largePhotoView.topAnchor),
+            largeImageView.bottomAnchor.constraint(equalTo: largePhotoView.bottomAnchor),
+            largeImageView.leadingAnchor.constraint(equalTo: largePhotoView.leadingAnchor),
+            largeImageView.trailingAnchor.constraint(equalTo: largePhotoView.trailingAnchor),
+
             largePhotoLabel.centerXAnchor.constraint(equalTo: largePhotoView.centerXAnchor),
             largePhotoLabel.centerYAnchor.constraint(equalTo: largePhotoView.centerYAnchor),
 
@@ -176,6 +199,11 @@ class FirstCardCell: UITableViewCell {
 
             smallPhotoLabel.centerXAnchor.constraint(equalTo: smallPhotoView.centerXAnchor),
             smallPhotoLabel.centerYAnchor.constraint(equalTo: smallPhotoView.centerYAnchor),
+
+            smallImageView.topAnchor.constraint(equalTo: smallPhotoView.topAnchor),
+            smallImageView.bottomAnchor.constraint(equalTo: smallPhotoView.bottomAnchor),
+            smallImageView.leadingAnchor.constraint(equalTo: smallPhotoView.leadingAnchor),
+            smallImageView.trailingAnchor.constraint(equalTo: smallPhotoView.trailingAnchor),
 
             extraCountContainer.topAnchor.constraint(equalTo: smallPhotoView.bottomAnchor, constant: 2),
             extraCountContainer.leadingAnchor.constraint(equalTo: rightColumn.leadingAnchor),
@@ -212,14 +240,60 @@ class FirstCardCell: UITableViewCell {
         ])
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        cancelImageRequests()
+        largeImageView.image = nil
+        smallImageView.image  = nil
+    }
+
     func configure(with first: First) {
+        cancelImageRequests()
+        largeImageView.image = nil
+        smallImageView.image  = nil
+
         largePhotoView.backgroundColor = first.largePhotoColor
         smallPhotoView.backgroundColor = first.smallPhotoColor
+
+        let ids = first.photoLocalIDs
+        largePhotoLabel.isHidden = !ids.isEmpty
+        smallPhotoLabel.isHidden = ids.count > 1
+
+        if ids.count > 0 { largeRequestID = loadPhoto(ids[0], into: largeImageView, pointSize: CGSize(width: 400, height: 220)) }
+        if ids.count > 1 { smallRequestID = loadPhoto(ids[1], into: smallImageView, pointSize: CGSize(width: 200, height: 100)) }
+
+        extraCountContainer.isHidden = first.extraPhotos == 0
         extraCountLabel.text = "+\(first.extraPhotos)"
         categoryLabel.text = first.category
         dateLabel.text = first.date
         titleLabel.text = first.title
-        subtitleLabel.text = "\(first.location) · \(first.duration), \(first.photoCount) photos"
+        if first.photoCount > 0 {
+            subtitleLabel.text = "\(first.location) · \(first.duration), \(first.photoCount) photos"
+        } else {
+            subtitleLabel.text = "\(first.location) · \(first.duration)"
+        }
+    }
+
+    private func cancelImageRequests() {
+        if let id = largeRequestID { PHImageManager.default().cancelImageRequest(id); largeRequestID = nil }
+        if let id = smallRequestID { PHImageManager.default().cancelImageRequest(id); smallRequestID = nil }
+    }
+
+    @discardableResult
+    private func loadPhoto(_ localID: String, into imageView: UIImageView, pointSize: CGSize) -> PHImageRequestID? {
+        let scale      = traitCollection.displayScale
+        let pixelSize  = CGSize(width: pointSize.width * scale, height: pointSize.height * scale)
+        let assets     = PHAsset.fetchAssets(withLocalIdentifiers: [localID], options: nil)
+        guard let asset = assets.firstObject else { return nil }
+        let opts = PHImageRequestOptions()
+        opts.deliveryMode          = .opportunistic
+        opts.isNetworkAccessAllowed = true
+        opts.resizeMode            = .fast
+        return PHImageManager.default().requestImage(
+            for: asset, targetSize: pixelSize, contentMode: .aspectFill, options: opts
+        ) { [weak imageView] image, _ in
+            DispatchQueue.main.async { imageView?.image = image }
+        }
     }
 }
 

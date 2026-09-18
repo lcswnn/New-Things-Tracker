@@ -12,6 +12,16 @@
 		<string>Karla-SemiBold.ttf</string>
 		<string>Karla-Bold.ttf</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>New Things Tracker needs your location to suggest firsts based on places you visit.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>New Things Tracker uses background location to detect arrivals and departures so it can suggest new firsts even when the app is closed.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>New Things Tracker reads photo dates and GPS coordinates to find firsts captured in your camera roll.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

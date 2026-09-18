@@ -1,5 +1,7 @@
 import UIKit
 import PhotosUI
+import CoreLocation
+import MapKit
 
 protocol ProfileViewControllerDelegate: AnyObject {
     func profileViewController(_ vc: ProfileViewController, didUpdatePhoto image: UIImage)
@@ -13,6 +15,9 @@ class ProfileViewController: UIViewController {
     private let scrollView  = UIScrollView()
     private let contentView = UIView()
     private let photoImageView = UIImageView()
+    private var homeAddressLabel: UILabel!
+    private var homeSetButton: UIButton!
+    private let homeLocationManager = CLLocationManager()
 
     private let gridItems: [(title: String, category: String, color: UIColor)] = [
         ("Randolph Street Market",     "Festival",      UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1)),
@@ -161,6 +166,10 @@ class ProfileViewController: UIViewController {
         let grid = buildGrid()
         contentView.addSubview(grid)
 
+        // — Home location —
+        let homeCard = buildHomeCard()
+        contentView.addSubview(homeCard)
+
         NSLayoutConstraint.activate([
             // close
             closeBtn.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
@@ -207,8 +216,13 @@ class ProfileViewController: UIViewController {
             statsStack.topAnchor.constraint(equalTo: editHint.bottomAnchor, constant: 26),
             statsStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
+            // home card
+            homeCard.topAnchor.constraint(equalTo: statsStack.bottomAnchor, constant: 20),
+            homeCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            homeCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
             // divider
-            divider.topAnchor.constraint(equalTo: statsStack.bottomAnchor, constant: 26),
+            divider.topAnchor.constraint(equalTo: homeCard.bottomAnchor, constant: 16),
             divider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             divider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             divider.heightAnchor.constraint(equalToConstant: 0.5),
@@ -253,6 +267,69 @@ class ProfileViewController: UIViewController {
             stack.addArrangedSubview(col)
         }
         return stack
+    }
+
+    // MARK: - Home card
+
+    private func buildHomeCard() -> UIView {
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor    = UIColor(named: "FogBackground")?.withAlphaComponent(0.10)
+        card.layer.cornerRadius = 14
+        card.layer.borderWidth  = 0.5
+        card.layer.borderColor  = UIColor(named: "FogBackground")?.withAlphaComponent(0.18).cgColor
+
+        let houseIcon = UIImageView(image: UIImage(systemName: "house.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)))
+        houseIcon.translatesAutoresizingMaskIntoConstraints = false
+        houseIcon.tintColor   = UIColor(named: "ClayAccent")
+        houseIcon.contentMode = .scaleAspectFit
+        card.addSubview(houseIcon)
+
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text      = "Home Location"
+        titleLabel.font      = .karla(.semibold, size: 13)
+        titleLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.80)
+        card.addSubview(titleLabel)
+
+        homeAddressLabel = UILabel()
+        homeAddressLabel.translatesAutoresizingMaskIntoConstraints = false
+        let savedName = UserDefaults.standard.string(forKey: "homeAddressName")
+        homeAddressLabel.text = savedName ?? "Not set"
+        homeAddressLabel.font = .karla(.regular, size: 12)
+        homeAddressLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.48)
+        homeAddressLabel.numberOfLines = 2
+        card.addSubview(homeAddressLabel)
+
+        homeSetButton = UIButton(type: .system)
+        homeSetButton.translatesAutoresizingMaskIntoConstraints = false
+        homeSetButton.setTitle(savedName != nil ? "Change" : "Set", for: .normal)
+        homeSetButton.titleLabel?.font = .karla(.semibold, size: 13)
+        homeSetButton.tintColor = UIColor(named: "ClayAccent")
+        homeSetButton.addTarget(self, action: #selector(setHomeTapped), for: .touchUpInside)
+        card.addSubview(homeSetButton)
+
+        NSLayoutConstraint.activate([
+            houseIcon.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
+            houseIcon.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            houseIcon.widthAnchor.constraint(equalToConstant: 18),
+            houseIcon.heightAnchor.constraint(equalToConstant: 18),
+
+            titleLabel.leadingAnchor.constraint(equalTo: houseIcon.trailingAnchor, constant: 10),
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: homeSetButton.leadingAnchor, constant: -8),
+
+            homeAddressLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            homeAddressLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            homeAddressLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            homeAddressLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+
+            homeSetButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            homeSetButton.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+        ])
+
+        return card
     }
 
     // MARK: - Grid
@@ -346,6 +423,28 @@ class ProfileViewController: UIViewController {
         present(picker, animated: true)
     }
 
+    @objc private func setHomeTapped() {
+        homeLocationManager.delegate = self
+        let status = homeLocationManager.authorizationStatus
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
+            homeAddressLabel.text = "Locating…"
+            homeLocationManager.requestLocation()
+        case .notDetermined:
+            homeLocationManager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            let alert = UIAlertController(
+                title: "Location Access Required",
+                message: "Go to Settings › Privacy › Location Services to enable location for this app.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        @unknown default:
+            homeLocationManager.requestWhenInUseAuthorization()
+        }
+    }
+
     @objc private func bioTapped() {
         let alert = UIAlertController(title: "Edit Bio", message: nil, preferredStyle: .alert)
         alert.addTextField { tf in
@@ -356,6 +455,45 @@ class ProfileViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "Save", style: .default))
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension ProfileViewController: CLLocationManagerDelegate {
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard manager === homeLocationManager else { return }
+        let status = manager.authorizationStatus
+        if status == .authorizedAlways || status == .authorizedWhenInUse {
+            homeAddressLabel.text = "Locating…"
+            manager.requestLocation()
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard manager === homeLocationManager, let loc = locations.first else { return }
+        UserDefaults.standard.set(loc.coordinate.latitude,  forKey: "homeLatitude")
+        UserDefaults.standard.set(loc.coordinate.longitude, forKey: "homeLongitude")
+
+        Task { @MainActor in
+            if let request = MKReverseGeocodingRequest(location: loc),
+               let mapItem = (try? await request.mapItems)?.first {
+                let name = mapItem.name ?? mapItem.address?.shortAddress ?? "Home"
+                UserDefaults.standard.set(name, forKey: "homeAddressName")
+                self.homeAddressLabel.text = name
+            } else {
+                let fallback = String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
+                UserDefaults.standard.set(fallback, forKey: "homeAddressName")
+                self.homeAddressLabel.text = fallback
+            }
+            self.homeSetButton.setTitle("Change", for: .normal)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        guard manager === homeLocationManager else { return }
+        homeAddressLabel.text = "Failed — try again"
     }
 }
 

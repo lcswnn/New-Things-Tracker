@@ -7,6 +7,8 @@
 
 import UIKit
 import MapKit
+import SwiftUI
+import Combine
 
 // Esri tile URLs use level/row/column order rather than the standard z/x/y
 private class EsriLightGrayTileOverlay: MKTileOverlay {
@@ -55,35 +57,33 @@ class ViewController: UIViewController {
     private var isMapMoving = false
     private var profileImage: UIImage?
 
+    // Live data pipeline
+    private let photoManager    = PhotoMetadataManager()
+    private let locationManager = LocationHistoryManager()
+    private var cancellables    = Set<AnyCancellable>()
+    private var hasRequestedPermissions = false
+    private var sections: [(month: String, firsts: [First])] = []
+    private var candidatesBySection: [[PlaceCandidate]] = []
+
+    // Cycles through these colors for card backgrounds while real photos aren't shown
+    private let cardColors: [(UIColor, UIColor)] = [
+        (UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1), UIColor(red: 0.82, green: 0.70, blue: 0.63, alpha: 1)),
+        (UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1), UIColor(red: 0.70, green: 0.80, blue: 0.74, alpha: 1)),
+        (UIColor(red: 0.65, green: 0.75, blue: 0.85, alpha: 1), UIColor(red: 0.55, green: 0.65, blue: 0.78, alpha: 1)),
+        (UIColor(red: 0.92, green: 0.85, blue: 0.72, alpha: 1), UIColor(red: 0.85, green: 0.78, blue: 0.65, alpha: 1)),
+        (UIColor(red: 0.82, green: 0.78, blue: 0.90, alpha: 1), UIColor(red: 0.72, green: 0.68, blue: 0.82, alpha: 1)),
+        (UIColor(red: 0.78, green: 0.88, blue: 0.84, alpha: 1), UIColor(red: 0.68, green: 0.80, blue: 0.76, alpha: 1)),
+    ]
+
+    private let cardDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f
+    }()
+    private let monthHeaderFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; return f
+    }()
+
     override var prefersStatusBarHidden: Bool { true }
-
-    private let reviewItems: [ReviewItem] = [
-        ReviewItem(label: "Green Mill Cocktail Lounge", date: "Today",  reason: "Confirm label"),
-        ReviewItem(label: "Unknown Venue",               date: "Sep 6", reason: "Possible duplicate of Randolph Street Market"),
-    ]
-
-    private let sections: [(month: String, firsts: [First])] = [
-        ("SEPTEMBER", [
-            First(title: "Randolph Street Market", location: "West Loop", category: "Festival",
-                  date: "Sat 6 Sep", duration: "4h 12m", photoCount: 23, extraPhotos: 21,
-                  largePhotoColor: UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1),
-                  smallPhotoColor: UIColor(red: 0.82, green: 0.70, blue: 0.63, alpha: 1)),
-            First(title: "First Jazz Concert", location: "River North", category: "Music",
-                  date: "Fri 19 Sep", duration: "2h 45m", photoCount: 11, extraPhotos: 9,
-                  largePhotoColor: UIColor(named: "DustySage") ?? .systemGray,
-                  smallPhotoColor: UIColor(named: "DustySage")?.withAlphaComponent(0.7) ?? .systemGray2),
-        ]),
-        ("AUGUST", [
-            First(title: "Hot Air Balloon Ride", location: "Napa Valley", category: "Adventure",
-                  date: "Sun 10 Aug", duration: "1h 30m", photoCount: 34, extraPhotos: 31,
-                  largePhotoColor: UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1),
-                  smallPhotoColor: UIColor(red: 0.70, green: 0.80, blue: 0.74, alpha: 1)),
-            First(title: "Drive-In Movie Night", location: "Wicker Park", category: "Entertainment",
-                  date: "Sat 23 Aug", duration: "3h 05m", photoCount: 8, extraPhotos: 6,
-                  largePhotoColor: UIColor(named: "ClayAccent")?.withAlphaComponent(0.4) ?? .systemOrange,
-                  smallPhotoColor: UIColor(named: "ClayAccent")?.withAlphaComponent(0.25) ?? .systemOrange),
-        ]),
-    ]
+    override var canBecomeFirstResponder: Bool { true }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -99,6 +99,12 @@ class ViewController: UIViewController {
         setupHeaderLine()
         setupNavBar()           // last — stays above all content
 
+        // Rebuild home cards whenever the place-candidate list changes (initial load + geocoding updates)
+        photoManager.$placeCandidates
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.rebuildSections() }
+            .store(in: &cancellables)
+
         // Start off-screen for entrance animation
         let offscreen = CGAffineTransform(translationX: 0, y: 120)
         navBarViews.forEach { $0.transform = offscreen; $0.alpha = 0 }
@@ -106,6 +112,13 @@ class ViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        becomeFirstResponder()
+
+        if !hasRequestedPermissions {
+            hasRequestedPermissions = true
+            locationManager.requestPermissionAndStart()
+            photoManager.requestPermissionAndFetch()
+        }
         let delays: [Double] = [0.06, 0.12, 0.06]
         for (view, delay) in zip(navBarViews, delays) {
             UIView.animate(withDuration: 0.52, delay: delay, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
@@ -228,6 +241,8 @@ class ViewController: UIViewController {
         greetingLabel.text = currentGreeting()
         greetingLabel.font = UIFont.fraunces(.bold, size: 26)
         greetingLabel.textColor = UIColor(named: "FogBackground")
+        greetingLabel.isUserInteractionEnabled = true
+        greetingLabel.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(debugLongPress(_:))))
         view.addSubview(greetingLabel)
 
         dateLabel = UILabel()
@@ -563,6 +578,79 @@ class ViewController: UIViewController {
             }
         }
     }
+
+    // MARK: - Home feed
+
+    private func rebuildSections() {
+        let candidates = photoManager.placeCandidates
+        guard !candidates.isEmpty else {
+            if !sections.isEmpty {
+                sections = []; candidatesBySection = []; tableView.reloadData()
+            }
+            return
+        }
+
+        let calendar = Calendar.current
+        var monthOrder: [Date] = []
+        var grouped: [Date: [PlaceCandidate]] = [:]
+
+        for candidate in candidates {
+            let comps = calendar.dateComponents([.year, .month], from: candidate.firstVisitDate)
+            let key   = calendar.date(from: comps)!
+            if grouped[key] == nil { grouped[key] = []; monthOrder.append(key) }
+            grouped[key]!.append(candidate)
+        }
+
+        monthOrder.sort { $0 > $1 }
+
+        var newSections: [(month: String, firsts: [First])] = []
+        var newCandidatesBySection: [[PlaceCandidate]] = []
+        var globalIndex = 0
+
+        for key in monthOrder {
+            let cands  = grouped[key]!
+            let header = monthHeaderFormatter.string(from: key).uppercased()
+            let firsts: [First] = cands.map { c in
+                defer { globalIndex += 1 }
+                let (large, small) = cardColors[globalIndex % cardColors.count]
+                return First(
+                    title:           c.placeName ?? "…",
+                    location:        "\(c.visitCount) visit\(c.visitCount == 1 ? "" : "s")",
+                    category:        "Place",
+                    date:            cardDateFormatter.string(from: c.firstVisitDate),
+                    duration:        "\(c.totalPhotoCount) photo\(c.totalPhotoCount == 1 ? "" : "s")",
+                    photoCount:      0,
+                    extraPhotos:     max(0, c.totalPhotoCount - 2),
+                    largePhotoColor: large,
+                    smallPhotoColor: small,
+                    photoLocalIDs:   c.photoLocalIDs
+                )
+            }
+            newSections.append((month: header, firsts: firsts))
+            newCandidatesBySection.append(cands)
+        }
+
+        sections             = newSections
+        candidatesBySection  = newCandidatesBySection
+        tableView.reloadData()
+    }
+
+    // Shake device OR long-press the greeting label to open the data-wiring debug screen
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        guard motion == .motionShake else { return }
+        presentDebugScreen()
+    }
+
+    @objc private func debugLongPress(_ gr: UILongPressGestureRecognizer) {
+        guard gr.state == .began else { return }
+        presentDebugScreen()
+    }
+
+    private func presentDebugScreen() {
+        let host = UIHostingController(rootView: NavigationView { WiringTestView() })
+        host.modalPresentationStyle = .pageSheet
+        present(host, animated: true)
+    }
 }
 
 extension ViewController: ProfileViewControllerDelegate {
@@ -593,70 +681,25 @@ extension ViewController: MKMapViewDelegate {
 extension ViewController: UITableViewDataSource, UITableViewDelegate {
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        sections.count + 1   // section 0 = review queue
+        sections.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 0 ? reviewItems.count : sections[section - 1].firsts.count
+        sections[section].firsts.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == 0 {
-            let cell = tableView.dequeueReusableCell(withIdentifier: ReviewQueueCell.identifier, for: indexPath) as! ReviewQueueCell
-            cell.configure(with: reviewItems[indexPath.row])
-            return cell
-        }
         let cell = tableView.dequeueReusableCell(withIdentifier: FirstCardCell.identifier, for: indexPath) as! FirstCardCell
-        cell.configure(with: sections[indexPath.section - 1].firsts[indexPath.row])
+        cell.configure(with: sections[indexPath.section].firsts[indexPath.row])
         return cell
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let container = UIView()
         container.backgroundColor = .clear
-
-        if section == 0 {
-            let label = UILabel()
-            label.translatesAutoresizingMaskIntoConstraints = false
-            label.attributedText = NSAttributedString(string: "NEEDS REVIEW", attributes: [
-                .font: UIFont.karla(.bold, size: 14),
-                .foregroundColor: UIColor(named: "FogBackground") ?? UIColor.white,
-                .kern: 1.8,
-            ])
-            container.addSubview(label)
-
-            let badge = UIView()
-            badge.translatesAutoresizingMaskIntoConstraints = false
-            badge.backgroundColor = UIColor(named: "ClayAccent")
-            badge.layer.cornerRadius = 10
-            container.addSubview(badge)
-
-            let badgeLabel = UILabel()
-            badgeLabel.translatesAutoresizingMaskIntoConstraints = false
-            badgeLabel.text = "\(reviewItems.count)"
-            badgeLabel.font = UIFont.karla(.bold, size: 12)
-            badgeLabel.textColor = UIColor(named: "FogBackground")
-            badge.addSubview(badgeLabel)
-
-            NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
-
-                badge.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-                badge.centerYAnchor.constraint(equalTo: label.centerYAnchor),
-
-                badgeLabel.topAnchor.constraint(equalTo: badge.topAnchor, constant: 3),
-                badgeLabel.bottomAnchor.constraint(equalTo: badge.bottomAnchor, constant: -3),
-                badgeLabel.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 8),
-                badgeLabel.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -8),
-            ])
-            return container
-        }
-
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.attributedText = NSAttributedString(string: sections[section - 1].month, attributes: [
+        label.attributedText = NSAttributedString(string: sections[section].month, attributes: [
             .font: UIFont.karla(.semibold, size: 12),
             .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
             .kern: 1.5,
@@ -671,4 +714,19 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 36 }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        guard indexPath.section < candidatesBySection.count,
+              indexPath.row < candidatesBySection[indexPath.section].count else { return }
+        let candidate = candidatesBySection[indexPath.section][indexPath.row]
+        let detailVC = PlaceDetailViewController(candidate: candidate)
+        detailVC.modalPresentationStyle = .pageSheet
+        if let sheet = detailVC.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        present(detailVC, animated: true)
+    }
 }
