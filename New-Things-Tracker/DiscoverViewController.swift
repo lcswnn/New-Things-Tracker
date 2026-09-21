@@ -1,4 +1,6 @@
 import UIKit
+import MapKit
+import CoreLocation
 
 class DiscoverViewController: UIViewController {
 
@@ -7,10 +9,70 @@ class DiscoverViewController: UIViewController {
     private var searchContainer: UIView!
     private var contentView: UIView!
     private var trendingStack: UIStackView!
+    private var nearYouScrollView: UIScrollView!
+    private var nearYouStatusLabel: UILabel!
+    private var categoryChips: [UIButton] = []
+
+    // MARK: - Nearby-firsts data pipeline
+    private let locationManager = CLLocationManager()
+    private let distanceFormatter = MKDistanceFormatter()
+    private var currentSearch: MKLocalSearch?
+    private var visitedCandidates: [PlaceCandidate] = []
+    private var nearbyMapItems: [MKMapItem] = []
+    private var allRankedResults: [(item: MKMapItem, distance: CLLocationDistance)] = []
+    private var selectedCategoryGroup: NearYouCategoryGroup = .all
+    private var hasLoadedNearbyFirsts = false
+    private var isLoadingNearbyFirsts = false
+
+    // Chip groups the user can filter "Near You" results by, mapped onto MapKit's POI categories.
+    private enum NearYouCategoryGroup: String, CaseIterable {
+        case all = "All"
+        case foodAndDrink = "Food & Drink"
+        case outdoors = "Outdoors"
+        case artsAndCulture = "Arts & Culture"
+        case funAndNightlife = "Fun & Nightlife"
+
+        // nil means "no filter" — include every category in experienceCategories.
+        var categories: [MKPointOfInterestCategory]? {
+            switch self {
+            case .all:
+                return nil
+            case .foodAndDrink:
+                return [.restaurant, .cafe, .bakery, .brewery, .winery, .distillery]
+            case .outdoors:
+                return [.park, .nationalPark, .beach, .campground, .marina, .hiking,
+                        .kayaking, .surfing, .swimming, .fishing, .golf, .miniGolf, .skiing]
+            case .artsAndCulture:
+                return [.museum, .musicVenue, .theater, .landmark, .nationalMonument, .castle, .fortress]
+            case .funAndNightlife:
+                return [.amusementPark, .aquarium, .zoo, .fairground, .movieTheater,
+                        .nightlife, .bowling, .goKart, .rockClimbing, .skating, .stadium]
+            }
+        }
+    }
+
+    // Curated set of "things to experience" — excludes utility categories like gas stations, ATMs, banks.
+    private static let experienceCategories: [MKPointOfInterestCategory] = [
+        .restaurant, .cafe, .bakery, .brewery, .winery, .distillery,
+        .museum, .musicVenue, .theater, .movieTheater, .nightlife,
+        .park, .nationalPark, .beach, .campground, .marina, .zoo, .aquarium,
+        .amusementPark, .fairground, .landmark, .nationalMonument, .castle, .fortress,
+        .hiking, .golf, .miniGolf, .bowling, .goKart, .rockClimbing,
+        .skiing, .skating, .kayaking, .surfing, .swimming, .fishing, .stadium,
+    ]
+
+    private let nearYouColors: [UIColor] = [
+        UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1),
+        UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1),
+        UIColor(named: "ClayAccent")?.withAlphaComponent(0.5) ?? .orange,
+        UIColor(named: "DustySage")?.withAlphaComponent(0.65) ?? .gray,
+        UIColor(red: 0.82, green: 0.88, blue: 0.75, alpha: 1),
+    ]
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor(named: "DustySage")
+        locationManager.delegate = self
         setupScrollLayout()
         setupTitle()
         setupSearchBar()
@@ -58,7 +120,7 @@ class DiscoverViewController: UIViewController {
 
         contextLabel = UILabel()
         contextLabel.translatesAutoresizingMaskIntoConstraints = false
-        contextLabel.text = "Chicago, IL  ·  47 things you haven't tried"
+        contextLabel.text = "Finding your location…"
         contextLabel.font = UIFont.karla(.regular, size: 14)
         contextLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.65)
         contentView.addSubview(contextLabel)
@@ -124,43 +186,259 @@ class DiscoverViewController: UIViewController {
         let sectionLabel = makeSectionHeader("Near You")
         contentView.addSubview(sectionLabel)
 
+        let chipsScrollView = UIScrollView()
+        chipsScrollView.translatesAutoresizingMaskIntoConstraints = false
+        chipsScrollView.showsHorizontalScrollIndicator = false
+        chipsScrollView.alwaysBounceHorizontal = true
+        contentView.addSubview(chipsScrollView)
+
+        let chipsStack = UIStackView()
+        chipsStack.translatesAutoresizingMaskIntoConstraints = false
+        chipsStack.axis = .horizontal
+        chipsStack.spacing = 8
+        chipsScrollView.addSubview(chipsStack)
+
+        for group in NearYouCategoryGroup.allCases {
+            let chip = makeCategoryChip(title: group.rawValue)
+            chipsStack.addArrangedSubview(chip)
+            categoryChips.append(chip)
+        }
+        styleChip(categoryChips[0], selected: true)
+
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.alwaysBounceHorizontal = true
         scrollView.clipsToBounds = false
         contentView.addSubview(scrollView)
+        nearYouScrollView = scrollView
+
+        let statusLabel = UILabel()
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.font = UIFont.karla(.regular, size: 14)
+        statusLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.5)
+        statusLabel.numberOfLines = 0
+        statusLabel.text = "Finding nearby firsts…"
+        contentView.addSubview(statusLabel)
+        nearYouStatusLabel = statusLabel
 
         NSLayoutConstraint.activate([
             sectionLabel.topAnchor.constraint(equalTo: searchContainer.bottomAnchor, constant: 30),
             sectionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
-            scrollView.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 14),
+            chipsScrollView.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 12),
+            chipsScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            chipsScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            chipsScrollView.heightAnchor.constraint(equalToConstant: 34),
+
+            chipsStack.topAnchor.constraint(equalTo: chipsScrollView.topAnchor),
+            chipsStack.bottomAnchor.constraint(equalTo: chipsScrollView.bottomAnchor),
+            chipsStack.leadingAnchor.constraint(equalTo: chipsScrollView.leadingAnchor, constant: 20),
+            chipsStack.trailingAnchor.constraint(equalTo: chipsScrollView.trailingAnchor, constant: -20),
+            chipsStack.heightAnchor.constraint(equalTo: chipsScrollView.heightAnchor),
+
+            scrollView.topAnchor.constraint(equalTo: chipsScrollView.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             scrollView.heightAnchor.constraint(equalToConstant: 200),
+
+            statusLabel.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 8),
+            statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
         ])
-
-        let placeholders: [(title: String, distance: String, color: UIColor)] = [
-            ("Millennium Park",  "0.3 mi away", UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1)),
-            ("Art Institute",    "0.6 mi away", UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1)),
-            ("Navy Pier",        "1.2 mi away", UIColor(named: "ClayAccent")?.withAlphaComponent(0.5) ?? .orange),
-            ("Riverwalk",        "0.5 mi away", UIColor(named: "DustySage")?.withAlphaComponent(0.65) ?? .gray),
-            ("Lincoln Park Zoo", "2.1 mi away", UIColor(red: 0.82, green: 0.88, blue: 0.75, alpha: 1)),
-        ]
-
-        let cardW: CGFloat = 160, cardH: CGFloat = 190, gap: CGFloat = 12, lead: CGFloat = 20
-        var x: CGFloat = lead
-        for item in placeholders {
-            let card = makeNearYouCard(title: item.title, distance: item.distance, color: item.color, width: cardW, height: cardH)
-            card.frame = CGRect(x: x, y: 0, width: cardW, height: cardH)
-            scrollView.addSubview(card)
-            x += cardW + gap
-        }
-        scrollView.contentSize = CGSize(width: x - gap + lead, height: cardH)
 
         // Keep a reference so Trending can anchor below
         scrollView.tag = 100
+    }
+
+    private func makeCategoryChip(title: String) -> UIButton {
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        config.background.cornerRadius = 16
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = UIFont.karla(.semibold, size: 13)
+            return outgoing
+        }
+        let button = UIButton(configuration: config)
+        button.addTarget(self, action: #selector(categoryChipTapped(_:)), for: .touchUpInside)
+        return button
+    }
+
+    private func styleChip(_ chip: UIButton, selected: Bool) {
+        guard var config = chip.configuration else { return }
+        config.baseForegroundColor = selected ? UIColor(named: "FogBackground") : UIColor(named: "DeepPineInk")
+        config.background.backgroundColor = selected
+            ? UIColor(named: "ClayAccent")
+            : UIColor(named: "FogBackground")?.withAlphaComponent(0.7)
+        chip.configuration = config
+    }
+
+    @objc private func categoryChipTapped(_ sender: UIButton) {
+        guard let index = categoryChips.firstIndex(of: sender) else { return }
+        let group = NearYouCategoryGroup.allCases[index]
+        guard group != selectedCategoryGroup else { return }
+        selectedCategoryGroup = group
+        for (i, chip) in categoryChips.enumerated() {
+            styleChip(chip, selected: i == index)
+        }
+        applyCategoryFilterAndDisplay()
+    }
+
+    // MARK: - Nearby-firsts pipeline (public API for the parent view controller)
+
+    // Snapshot of the places the user has already visited, so real POI results can exclude them.
+    func updateVisitedCandidates(_ candidates: [PlaceCandidate]) {
+        visitedCandidates = candidates
+    }
+
+    // Called by the parent view controller when this tab becomes active. Loads once per session;
+    // permission-denied/error states are allowed to retry on the next visit since MapKit's on-device
+    // search is free and there's no cost to trying again.
+    func refreshIfNeeded() {
+        guard !hasLoadedNearbyFirsts, !isLoadingNearbyFirsts else { return }
+        beginLocationLookup()
+    }
+
+    private func beginLocationLookup() {
+        isLoadingNearbyFirsts = true
+        selectedCategoryGroup = .all
+        for (index, chip) in categoryChips.enumerated() {
+            styleChip(chip, selected: index == 0)
+        }
+        showNearYouMessage("Finding nearby firsts…")
+
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.requestLocation()
+        case .denied, .restricted:
+            isLoadingNearbyFirsts = false
+            showNearYouMessage("Enable Location Services in Settings to see nearby firsts.")
+        @unknown default:
+            isLoadingNearbyFirsts = false
+        }
+    }
+
+    private func searchNearbyFirsts(around coordinate: CLLocationCoordinate2D) {
+        currentSearch?.cancel()
+
+        let request = MKLocalPointsOfInterestRequest(center: coordinate, radius: 8_000)
+        request.pointOfInterestFilter = MKPointOfInterestFilter(including: Self.experienceCategories)
+
+        let search = MKLocalSearch(request: request)
+        currentSearch = search
+        search.start { [weak self] response, error in
+            DispatchQueue.main.async {
+                self?.handleSearchResults(response, error: error, origin: coordinate)
+            }
+        }
+    }
+
+    private func handleSearchResults(_ response: MKLocalSearch.Response?, error: Error?, origin: CLLocationCoordinate2D) {
+        isLoadingNearbyFirsts = false
+        hasLoadedNearbyFirsts = true
+
+        guard let mapItems = response?.mapItems, !mapItems.isEmpty else {
+            allRankedResults = []
+            showNearYouMessage("No new places to discover nearby yet.")
+            updateContextLabel(origin: origin, count: 0)
+            return
+        }
+
+        let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+        let visitedLocations = visitedCandidates.map {
+            CLLocation(latitude: $0.centroid.latitude, longitude: $0.centroid.longitude)
+        }
+
+        allRankedResults = mapItems
+            .filter { item in
+                let itemLocation = CLLocation(latitude: item.placemark.coordinate.latitude, longitude: item.placemark.coordinate.longitude)
+                return !visitedLocations.contains { $0.distance(from: itemLocation) < 120 }
+            }
+            .map { item -> (item: MKMapItem, distance: CLLocationDistance) in
+                let itemLocation = CLLocation(latitude: item.placemark.coordinate.latitude, longitude: item.placemark.coordinate.longitude)
+                return (item, originLocation.distance(from: itemLocation))
+            }
+            .sorted { $0.distance < $1.distance }
+
+        updateContextLabel(origin: origin, count: allRankedResults.count)
+        applyCategoryFilterAndDisplay()
+    }
+
+    // Re-filters the already-fetched results by the selected chip — no new network/search call needed.
+    private func applyCategoryFilterAndDisplay() {
+        let filtered: [(item: MKMapItem, distance: CLLocationDistance)]
+        if let categories = selectedCategoryGroup.categories {
+            filtered = allRankedResults.filter { result in
+                guard let category = result.item.pointOfInterestCategory else { return false }
+                return categories.contains(category)
+            }
+        } else {
+            filtered = allRankedResults
+        }
+
+        guard !filtered.isEmpty else {
+            showNearYouMessage(selectedCategoryGroup == .all
+                ? "Looks like you've already tried everything nearby!"
+                : "No \(selectedCategoryGroup.rawValue.lowercased()) nearby yet.")
+            return
+        }
+
+        displayNearbyFirsts(Array(filtered.prefix(12)))
+    }
+
+    private func updateContextLabel(origin: CLLocationCoordinate2D, count: Int) {
+        let location = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, _ in
+            guard let self else { return }
+            let place = placemarks?.first
+            let locationText = [place?.locality ?? place?.subAdministrativeArea, place?.administrativeArea]
+                .compactMap { $0 }
+                .joined(separator: ", ")
+
+            DispatchQueue.main.async {
+                let countText = "\(count) new thing\(count == 1 ? "" : "s") to try nearby"
+                self.contextLabel.text = locationText.isEmpty ? countText : "\(locationText)  ·  \(countText)"
+            }
+        }
+    }
+
+    private func showNearYouMessage(_ text: String) {
+        nearYouScrollView.subviews.forEach { $0.removeFromSuperview() }
+        nearbyMapItems = []
+        nearYouStatusLabel.text = text
+        nearYouStatusLabel.isHidden = false
+    }
+
+    private func displayNearbyFirsts(_ results: [(item: MKMapItem, distance: CLLocationDistance)]) {
+        nearYouStatusLabel.isHidden = true
+        nearYouScrollView.subviews.forEach { $0.removeFromSuperview() }
+        nearbyMapItems = results.map { $0.item }
+
+        let cardW: CGFloat = 160, cardH: CGFloat = 190, gap: CGFloat = 12, lead: CGFloat = 20
+        var x: CGFloat = lead
+        for (index, result) in results.enumerated() {
+            let color = nearYouColors[index % nearYouColors.count]
+            let distanceText = distanceFormatter.string(fromDistance: result.distance) + " away"
+            let card = makeNearYouCard(title: result.item.name ?? "Somewhere new", distance: distanceText, color: color, width: cardW, height: cardH)
+            card.frame = CGRect(x: x, y: 0, width: cardW, height: cardH)
+            card.tag = index
+            card.isUserInteractionEnabled = true
+            card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(nearYouCardTapped(_:))))
+            nearYouScrollView.addSubview(card)
+            x += cardW + gap
+        }
+        nearYouScrollView.contentSize = CGSize(width: x - gap + lead, height: cardH)
+    }
+
+    @objc private func nearYouCardTapped(_ gesture: UITapGestureRecognizer) {
+        guard let tag = gesture.view?.tag, tag < nearbyMapItems.count else { return }
+        let detailVC = MKMapItemDetailViewController(mapItem: nearbyMapItems[tag])
+        detailVC.delegate = self
+        present(detailVC, animated: true)
     }
 
     // MARK: - Trending
@@ -447,5 +725,39 @@ class DiscoverViewController: UIViewController {
         ])
 
         return row
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension DiscoverViewController: CLLocationManagerDelegate {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            manager.requestLocation()
+        case .denied, .restricted:
+            isLoadingNearbyFirsts = false
+            showNearYouMessage("Enable Location Services in Settings to see nearby firsts.")
+        default:
+            break
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        searchNearbyFirsts(around: location.coordinate)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        isLoadingNearbyFirsts = false
+        showNearYouMessage("Couldn't determine your location.")
+    }
+}
+
+// MARK: - MKMapItemDetailViewControllerDelegate
+
+extension DiscoverViewController: MKMapItemDetailViewControllerDelegate {
+    func mapItemDetailViewControllerDidFinish(_ detailViewController: MKMapItemDetailViewController) {
+        detailViewController.dismiss(animated: true)
     }
 }

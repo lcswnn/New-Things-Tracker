@@ -297,6 +297,97 @@ class FirstCardCell: UITableViewCell {
     }
 }
 
+// MARK: - PastFirstRowCell
+
+// Collapsed row used in the "Past Firsts" section — same info as FirstCardCell, without the big photo layout.
+class PastFirstRowCell: UITableViewCell {
+    static let identifier = "PastFirstRowCell"
+
+    private let card = UIView()
+    private let swatch = UIView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let chevron = UIImageView()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupCell()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupCell() {
+        backgroundColor = .clear
+        selectionStyle = .none
+
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(named: "FogBackground")
+        card.layer.cornerRadius = 14
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.06
+        card.layer.shadowOffset = CGSize(width: 0, height: 2)
+        card.layer.shadowRadius = 6
+        contentView.addSubview(card)
+
+        swatch.translatesAutoresizingMaskIntoConstraints = false
+        swatch.layer.cornerRadius = 10
+        swatch.clipsToBounds = true
+        card.addSubview(swatch)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .fraunces(.semibold, size: 16)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        titleLabel.numberOfLines = 1
+        card.addSubview(titleLabel)
+
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.font = .karla(.regular, size: 13)
+        subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.5)
+        subtitleLabel.numberOfLines = 1
+        card.addSubview(subtitleLabel)
+
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        chevron.image = UIImage(systemName: "chevron.right",
+                                withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium))
+        chevron.tintColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.25)
+        chevron.contentMode = .scaleAspectFit
+        card.addSubview(chevron)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            swatch.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            swatch.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            swatch.widthAnchor.constraint(equalToConstant: 40),
+            swatch.heightAnchor.constraint(equalToConstant: 40),
+            swatch.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
+            swatch.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10),
+
+            chevron.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
+            chevron.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 12),
+
+            titleLabel.leadingAnchor.constraint(equalTo: swatch.trailingAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            subtitleLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -10),
+        ])
+    }
+
+    func configure(with first: First) {
+        swatch.backgroundColor = first.largePhotoColor
+        titleLabel.text = first.title
+        subtitleLabel.text = "\(first.date) · \(first.location)"
+    }
+}
+
 // MARK: - Occasion model
 
 struct Occasion {
@@ -314,6 +405,7 @@ struct ReviewItem {
     let label: String
     let date: String
     let reason: String
+    let photoLocalIDs: [String]
 }
 
 // MARK: - OccasionCell
@@ -436,19 +528,32 @@ class OccasionCell: UITableViewCell {
     }
 }
 
-// MARK: - ReviewQueueCell
+// MARK: - ReviewCardCell
 
-class ReviewQueueCell: UITableViewCell {
-    static let identifier = "ReviewQueueCell"
+protocol ReviewCardCellDelegate: AnyObject {
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesAt index: Int)
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoAt index: Int)
+    func reviewCardCell(_ cell: ReviewCardCell, didTapCardAt index: Int)
+}
+
+// Single table row holding a horizontally-paged stack of ReviewPageCells, one per place needing input,
+// with a page control along the bottom instead of separate rows.
+class ReviewCardCell: UITableViewCell {
+    static let identifier = "ReviewCardCell"
+
+    weak var delegate: ReviewCardCellDelegate?
 
     private let card = UIView()
-    private let accentBar = UIView()
-    private let iconLabel = UILabel()
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let chevron = UIImageView()
+    private let collectionView: UICollectionView
+    private let pageControl = UIPageControl()
+    private var items: [ReviewItem] = []
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupCell()
     }
@@ -460,47 +565,25 @@ class ReviewQueueCell: UITableViewCell {
         selectionStyle = .none
 
         card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = UIColor(named: "FogBackground")
-        card.layer.cornerRadius = 14
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.07
-        card.layer.shadowOffset = CGSize(width: 0, height: 2)
-        card.layer.shadowRadius = 6
+        card.backgroundColor = .clear
         contentView.addSubview(card)
 
-        accentBar.translatesAutoresizingMaskIntoConstraints = false
-        accentBar.backgroundColor = UIColor(named: "ClayAccent")
-        accentBar.layer.cornerRadius = 1.5
-        card.addSubview(accentBar)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .clear
+        collectionView.isPagingEnabled = true
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.register(ReviewPageCell.self, forCellWithReuseIdentifier: ReviewPageCell.identifier)
+        card.addSubview(collectionView)
 
-        iconLabel.translatesAutoresizingMaskIntoConstraints = false
-        iconLabel.text = "!"
-        iconLabel.font = .karla(.bold, size: 13)
-        iconLabel.textColor = UIColor(named: "ClayAccent")
-        iconLabel.textAlignment = .center
-        iconLabel.backgroundColor = UIColor(named: "ClayAccent")?.withAlphaComponent(0.15)
-        iconLabel.layer.cornerRadius = 12
-        iconLabel.layer.masksToBounds = true
-        card.addSubview(iconLabel)
-
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .fraunces(.bold, size: 18)
-        titleLabel.textColor = UIColor(named: "DeepPineInk")
-        titleLabel.numberOfLines = 1
-        card.addSubview(titleLabel)
-
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.font = .karla(.medium, size: 13)
-        subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.52)
-        subtitleLabel.numberOfLines = 1
-        card.addSubview(subtitleLabel)
-
-        chevron.translatesAutoresizingMaskIntoConstraints = false
-        chevron.image = UIImage(systemName: "chevron.right",
-                                withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium))
-        chevron.tintColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.25)
-        chevron.contentMode = .scaleAspectFit
-        card.addSubview(chevron)
+        pageControl.translatesAutoresizingMaskIntoConstraints = false
+        // Custom dot images with a white outline so the dots stay visible against any background.
+        pageControl.preferredIndicatorImage = makeDotImage(fillColor: (UIColor(named: "DeepPineInk") ?? .black).withAlphaComponent(0.35))
+        pageControl.preferredCurrentPageIndicatorImage = makeDotImage(fillColor: UIColor(named: "ClayAccent") ?? .orange)
+        pageControl.hidesForSinglePage = true
+        pageControl.isUserInteractionEnabled = false
+        card.addSubview(pageControl)
 
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 5),
@@ -508,33 +591,316 @@ class ReviewQueueCell: UITableViewCell {
             card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
 
-            accentBar.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
-            accentBar.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
-            accentBar.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 14),
-            accentBar.widthAnchor.constraint(equalToConstant: 3),
+            collectionView.topAnchor.constraint(equalTo: card.topAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            collectionView.heightAnchor.constraint(equalToConstant: 132),
 
-            iconLabel.leadingAnchor.constraint(equalTo: accentBar.trailingAnchor, constant: 12),
-            iconLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
-            iconLabel.widthAnchor.constraint(equalToConstant: 24),
-            iconLabel.heightAnchor.constraint(equalToConstant: 24),
-
-            titleLabel.leadingAnchor.constraint(equalTo: iconLabel.trailingAnchor, constant: 10),
-            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
-            titleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
-
-            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            subtitleLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
-            subtitleLabel.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -8),
-
-            chevron.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-            chevron.centerYAnchor.constraint(equalTo: card.centerYAnchor),
-            chevron.widthAnchor.constraint(equalToConstant: 12),
+            pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 6),
+            pageControl.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            pageControl.bottomAnchor.constraint(equalTo: card.bottomAnchor),
         ])
+    }
+
+    private func makeDotImage(fillColor: UIColor, diameter: CGFloat = 7, borderWidth: CGFloat = 1.3) -> UIImage {
+        let size = CGSize(width: diameter + borderWidth * 2, height: diameter + borderWidth * 2)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            let rect = CGRect(x: borderWidth, y: borderWidth, width: diameter, height: diameter)
+            let path = UIBezierPath(ovalIn: rect)
+            fillColor.setFill()
+            path.fill()
+            UIColor.white.setStroke()
+            path.lineWidth = borderWidth
+            path.stroke()
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout,
+              collectionView.bounds.width > 0,
+              layout.itemSize != collectionView.bounds.size else { return }
+        layout.itemSize = collectionView.bounds.size
+        layout.invalidateLayout()
+    }
+
+    // items.count is expected to only ever shrink by one between calls (an answered candidate leaving
+    // the queue), so keeping the same page index naturally reveals the next place needing input.
+    func configure(with items: [ReviewItem], delegate: ReviewCardCellDelegate?) {
+        self.items = items
+        self.delegate = delegate
+        collectionView.isUserInteractionEnabled = true
+        pageControl.numberOfPages = items.count
+        let clampedPage = min(pageControl.currentPage, max(items.count - 1, 0))
+        pageControl.currentPage = clampedPage
+        collectionView.reloadData()
+        collectionView.layoutIfNeeded()
+        guard !items.isEmpty else { return }
+        collectionView.scrollToItem(at: IndexPath(item: clampedPage, section: 0), at: .centeredHorizontally, animated: false)
+    }
+
+    // Shrinks and fades the answered card into the background, then swipes the carousel to the next
+    // page (if there is one) before handing off to the delegate, so answering Yes/No visibly settles
+    // the current card and advances to the next place instead of just popping out.
+    private func answerAndAdvance(from index: Int, completion: @escaping () -> Void) {
+        collectionView.isUserInteractionEnabled = false
+        let answeredCell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? ReviewPageCell
+
+        let advance = { [weak self] in
+            guard let self else { completion(); return }
+            let nextIndex = index + 1
+            guard nextIndex < self.items.count, self.collectionView.bounds.width > 0 else {
+                completion()
+                return
+            }
+            self.pageControl.currentPage = nextIndex
+            UIView.animate(withDuration: 0.32, delay: 0, options: [.curveEaseInOut], animations: {
+                self.collectionView.scrollToItem(at: IndexPath(item: nextIndex, section: 0), at: .centeredHorizontally, animated: false)
+            }, completion: { _ in
+                self.pageControl.currentPage = index
+                completion()
+            })
+        }
+
+        if let answeredCell {
+            answeredCell.playAnsweredAnimation(completion: advance)
+        } else {
+            advance()
+        }
+    }
+}
+
+extension ReviewCardCell: UICollectionViewDataSource, UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        items.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ReviewPageCell.identifier, for: indexPath) as! ReviewPageCell
+        cell.configure(with: items[indexPath.item])
+        cell.onYes = { [weak self] in
+            guard let self else { return }
+            self.answerAndAdvance(from: indexPath.item) {
+                self.delegate?.reviewCardCell(self, didAnswerYesAt: indexPath.item)
+            }
+        }
+        cell.onNo = { [weak self] in
+            guard let self else { return }
+            self.answerAndAdvance(from: indexPath.item) {
+                self.delegate?.reviewCardCell(self, didAnswerNoAt: indexPath.item)
+            }
+        }
+        cell.onTapCard = { [weak self] in
+            guard let self else { return }
+            self.delegate?.reviewCardCell(self, didTapCardAt: indexPath.item)
+        }
+        return cell
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        guard scrollView.bounds.width > 0, !items.isEmpty else { return }
+        let page = Int(round(scrollView.contentOffset.x / scrollView.bounds.width))
+        pageControl.currentPage = max(0, min(page, items.count - 1))
+    }
+}
+
+// MARK: - ReviewPageCell
+
+// One page of the ReviewCardCell carousel — a photo of the place, its name, when it was visited, and Yes/No buttons.
+class ReviewPageCell: UICollectionViewCell {
+    static let identifier = "ReviewPageCell"
+
+    var onYes: (() -> Void)?
+    var onNo: (() -> Void)?
+    var onTapCard: (() -> Void)?
+
+    private let card = UIView()
+    private let thumbnailView = UIView()
+    private let thumbnailImageView = UIImageView()
+    private let placeholderIcon = UIImageView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let noButton = UIButton(type: .system)
+    private let yesButton = UIButton(type: .system)
+    private var imageRequestID: PHImageRequestID?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupCell()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func setupCell() {
+        backgroundColor = .clear
+
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = UIColor(named: "FogBackground")
+        card.layer.cornerRadius = 18
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.08
+        card.layer.shadowOffset = CGSize(width: 0, height: 3)
+        card.layer.shadowRadius = 8
+        contentView.addSubview(card)
+
+        thumbnailView.translatesAutoresizingMaskIntoConstraints = false
+        thumbnailView.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.08)
+        thumbnailView.layer.cornerRadius = 12
+        thumbnailView.clipsToBounds = true
+        card.addSubview(thumbnailView)
+
+        placeholderIcon.translatesAutoresizingMaskIntoConstraints = false
+        placeholderIcon.image = UIImage(systemName: "photo",
+                                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium))
+        placeholderIcon.tintColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.25)
+        placeholderIcon.contentMode = .scaleAspectFit
+        thumbnailView.addSubview(placeholderIcon)
+
+        thumbnailImageView.translatesAutoresizingMaskIntoConstraints = false
+        thumbnailImageView.contentMode = .scaleAspectFill
+        thumbnailImageView.clipsToBounds = true
+        thumbnailView.addSubview(thumbnailImageView)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .fraunces(.bold, size: 19)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        titleLabel.numberOfLines = 1
+        card.addSubview(titleLabel)
+
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.font = .karla(.regular, size: 13)
+        subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.52)
+        subtitleLabel.numberOfLines = 1
+        card.addSubview(subtitleLabel)
+
+        configureButton(noButton, title: "No", filled: false)
+        noButton.translatesAutoresizingMaskIntoConstraints = false
+        noButton.addTarget(self, action: #selector(noTapped), for: .touchUpInside)
+        card.addSubview(noButton)
+
+        configureButton(yesButton, title: "Yes", filled: true)
+        yesButton.translatesAutoresizingMaskIntoConstraints = false
+        yesButton.addTarget(self, action: #selector(yesTapped), for: .touchUpInside)
+        card.addSubview(yesButton)
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cardTapped))
+        tapGesture.delegate = self
+        card.isUserInteractionEnabled = true
+        card.addGestureRecognizer(tapGesture)
+
+        NSLayoutConstraint.activate([
+            // Inset from the collection-view cell edges so adjacent cards don't visually touch while swiping.
+            card.topAnchor.constraint(equalTo: contentView.topAnchor),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 6),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -6),
+
+            thumbnailView.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
+            thumbnailView.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            thumbnailView.widthAnchor.constraint(equalToConstant: 52),
+            thumbnailView.heightAnchor.constraint(equalToConstant: 52),
+
+            placeholderIcon.centerXAnchor.constraint(equalTo: thumbnailView.centerXAnchor),
+            placeholderIcon.centerYAnchor.constraint(equalTo: thumbnailView.centerYAnchor),
+
+            thumbnailImageView.topAnchor.constraint(equalTo: thumbnailView.topAnchor),
+            thumbnailImageView.bottomAnchor.constraint(equalTo: thumbnailView.bottomAnchor),
+            thumbnailImageView.leadingAnchor.constraint(equalTo: thumbnailView.leadingAnchor),
+            thumbnailImageView.trailingAnchor.constraint(equalTo: thumbnailView.trailingAnchor),
+
+            titleLabel.topAnchor.constraint(equalTo: thumbnailView.topAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: thumbnailView.trailingAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+
+            noButton.topAnchor.constraint(equalTo: thumbnailView.bottomAnchor, constant: 16),
+            noButton.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
+            noButton.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            noButton.trailingAnchor.constraint(equalTo: card.centerXAnchor, constant: -6),
+            noButton.heightAnchor.constraint(equalToConstant: 36),
+
+            yesButton.topAnchor.constraint(equalTo: noButton.topAnchor),
+            yesButton.bottomAnchor.constraint(equalTo: noButton.bottomAnchor),
+            yesButton.leadingAnchor.constraint(equalTo: card.centerXAnchor, constant: 6),
+            yesButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+        ])
+    }
+
+    private func configureButton(_ button: UIButton, title: String, filled: Bool) {
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = .karla(.semibold, size: 15)
+        button.layer.cornerRadius = 18
+        if filled {
+            button.backgroundColor = UIColor(named: "DeepPineInk")
+            button.setTitleColor(UIColor(named: "FogBackground"), for: .normal)
+        } else {
+            button.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.08)
+            button.setTitleColor(UIColor(named: "DeepPineInk"), for: .normal)
+        }
+    }
+
+    @objc private func yesTapped() { onYes?() }
+    @objc private func noTapped() { onNo?() }
+    @objc private func cardTapped() { onTapCard?() }
+
+    // Shrinks and fades this card back before the carousel advances, so answering reads as "this
+    // card recedes" rather than an abrupt cut to the next page.
+    func playAnsweredAnimation(completion: @escaping () -> Void) {
+        isUserInteractionEnabled = false
+        UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseIn], animations: {
+            self.card.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+            self.card.alpha = 0
+        }, completion: { _ in
+            completion()
+        })
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        if let id = imageRequestID { PHImageManager.default().cancelImageRequest(id); imageRequestID = nil }
+        thumbnailImageView.image = nil
+        placeholderIcon.isHidden = false
+        card.transform = .identity
+        card.alpha = 1
+        isUserInteractionEnabled = true
     }
 
     func configure(with item: ReviewItem) {
         titleLabel.text = item.label
         subtitleLabel.text = "\(item.date) · \(item.reason)"
+
+        thumbnailImageView.image = nil
+        placeholderIcon.isHidden = !item.photoLocalIDs.isEmpty
+        if let localID = item.photoLocalIDs.first {
+            imageRequestID = loadThumbnail(localID, pointSize: CGSize(width: 52, height: 52))
+        }
+    }
+
+    @discardableResult
+    private func loadThumbnail(_ localID: String, pointSize: CGSize) -> PHImageRequestID? {
+        let scale     = traitCollection.displayScale
+        let pixelSize = CGSize(width: pointSize.width * scale, height: pointSize.height * scale)
+        let assets    = PHAsset.fetchAssets(withLocalIdentifiers: [localID], options: nil)
+        guard let asset = assets.firstObject else { return nil }
+        let opts = PHImageRequestOptions()
+        opts.deliveryMode           = .opportunistic
+        opts.isNetworkAccessAllowed = true
+        opts.resizeMode             = .fast
+        return PHImageManager.default().requestImage(
+            for: asset, targetSize: pixelSize, contentMode: .aspectFill, options: opts
+        ) { [weak self] image, _ in
+            DispatchQueue.main.async { self?.thumbnailImageView.image = image }
+        }
+    }
+}
+
+extension ReviewPageCell: UIGestureRecognizerDelegate {
+    // Let taps over the Yes/No buttons hit those controls instead of the card's tap gesture.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        let point = touch.location(in: card)
+        return !noButton.frame.contains(point) && !yesButton.frame.contains(point)
     }
 }
