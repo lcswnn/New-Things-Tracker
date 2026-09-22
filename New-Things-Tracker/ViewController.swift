@@ -26,11 +26,13 @@ class ViewController: UIViewController {
         case review
         case mostRecent
         case month(Date)
+        case footer
     }
 
     private nonisolated enum FeedItem: Hashable {
-        case reviewCarousel
+        case review(PersistentIdentifier)
         case first(PersistentIdentifier)
+        case footer
     }
 
     // Island bar sits 60pt tall + 16pt gap above safeAreaLayoutGuide.bottomAnchor
@@ -39,6 +41,14 @@ class ViewController: UIViewController {
     private var profileButtonView: UIButton!
     private var profileButtonContainer: UIView!
     private var mapView: MKMapView!
+    private var mapTitleLabel: UILabel!
+    private var mapInfoCard: UIView!
+    private var mapPinsCitiesLabel: UILabel!
+    private var mapRecentThumbView: UIView!
+    private var mapRecentImageView: UIImageView!
+    private var mapRecentTitleLabel: UILabel!
+    private var mapRecentSubtitleLabel: UILabel!
+    private var mapRecentRequestID: PHImageRequestID?
     private var statsView: UIView!
     private var discoverView: UIView!
     private var discoverVC: DiscoverViewController!
@@ -56,8 +66,6 @@ class ViewController: UIViewController {
     private var greetingLabel: UILabel!
     private var dateLabel: UILabel!
     private weak var headerFadeView: UIView?
-    private var isBarHidden = false
-    private var isMapMoving = false
     private var profileImage: UIImage?
 
     // Set by SceneDelegate.scene(_:willConnectTo:) before viewDidAppear runs. Never read before
@@ -73,9 +81,9 @@ class ViewController: UIViewController {
     private var placesByID: [PersistentIdentifier: PlaceSummary] = [:]
     private var mostRecentID: PersistentIdentifier?
     private var pendingReviewItems: [ReviewItem] = []
-    private weak var statsTotalLabel: UILabel?
-    private weak var statsMonthLabel: UILabel?
-    private weak var statsStreakLabel: UILabel?
+    private var footerTotal = 0
+    private var footerThisYear = 0
+    private var footerCities = 0
 
     // Cycles through these colors for card backgrounds while real photos aren't shown
     private let cardColors: [(UIColor, UIColor)] = [
@@ -92,6 +100,9 @@ class ViewController: UIViewController {
     }()
     private let monthHeaderFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; return f
+    }()
+    private let mapRecentDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
     }()
     private let reviewDateFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "EEE d MMM 'at' h:mm a"; return f
@@ -126,6 +137,8 @@ class ViewController: UIViewController {
 
         if !hasRequestedPermissions {
             hasRequestedPermissions = true
+            statsVC.environment = environment
+            statsVC.refresh()
             subscribeToStore()
             locationManager.onVisit = { [weak self] visit in
                 self?.environment.store.recordVisit(visit)
@@ -151,6 +164,8 @@ class ViewController: UIViewController {
             .sink { [weak self] places, _ in
                 self?.applySnapshot()
                 self?.discoverVC.updateVisitedCoordinates(places.map { $0.centroid })
+                self?.updateMapInfoCard()
+                self?.statsVC.refresh()
             }
             .store(in: &cancellables)
     }
@@ -190,6 +205,8 @@ class ViewController: UIViewController {
         mapView.delegate = self
         mapView.showsCompass = false
         mapView.showsScale = false
+        mapView.layer.cornerRadius = 28
+        mapView.clipsToBounds = true
 
         // Muted standard style — clean, low-distraction, loads instantly from system cache
         let config = MKStandardMapConfiguration(emphasisStyle: .muted)
@@ -197,17 +214,163 @@ class ViewController: UIViewController {
         config.pointOfInterestFilter = .excludingAll
         mapView.preferredConfiguration = config
 
-        let mapTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMapTap(_:)))
-        mapView.addGestureRecognizer(mapTapGesture)
-
         view.addSubview(mapView)
 
+        mapTitleLabel = UILabel()
+        mapTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        mapTitleLabel.text = "Map"
+        mapTitleLabel.font = UIFont.frauncesBoldItalic(size: 28)
+        mapTitleLabel.textColor = UIColor(named: "FogBackground")
+        mapTitleLabel.textAlignment = .center
+        mapTitleLabel.isHidden = true
+        view.addSubview(mapTitleLabel)
+
+        setupMapInfoCard()
+
         NSLayoutConstraint.activate([
-            mapView.topAnchor.constraint(equalTo: view.topAnchor),
-            mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            mapTitleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
+            mapTitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            mapTitleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+
+            mapView.topAnchor.constraint(equalTo: mapTitleLabel.bottomAnchor, constant: 16),
+            mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            mapView.bottomAnchor.constraint(equalTo: mapInfoCard.topAnchor, constant: -16),
         ])
+    }
+
+    private func setupMapInfoCard() {
+        mapInfoCard = UIView()
+        mapInfoCard.translatesAutoresizingMaskIntoConstraints = false
+        mapInfoCard.backgroundColor = UIColor(named: "FogBackground")
+        mapInfoCard.layer.cornerRadius = 22
+        mapInfoCard.layer.shadowColor = UIColor.black.cgColor
+        mapInfoCard.layer.shadowOpacity = 0.15
+        mapInfoCard.layer.shadowOffset = CGSize(width: 0, height: 4)
+        mapInfoCard.layer.shadowRadius = 12
+        mapInfoCard.isHidden = true
+        view.addSubview(mapInfoCard)
+
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = "Your firsts map"
+        titleLabel.font = UIFont.fraunces(.bold, size: 18)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        mapInfoCard.addSubview(titleLabel)
+
+        let pinsLabel = UILabel()
+        pinsLabel.translatesAutoresizingMaskIntoConstraints = false
+        pinsLabel.font = UIFont.karla(.regular, size: 13)
+        pinsLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.50)
+        mapInfoCard.addSubview(pinsLabel)
+        mapPinsCitiesLabel = pinsLabel
+
+        let divider = UIView()
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.backgroundColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.10)
+        mapInfoCard.addSubview(divider)
+
+        let thumb = UIView()
+        thumb.translatesAutoresizingMaskIntoConstraints = false
+        thumb.layer.cornerRadius = 12
+        thumb.clipsToBounds = true
+        mapInfoCard.addSubview(thumb)
+        mapRecentThumbView = thumb
+
+        let thumbImage = UIImageView()
+        thumbImage.translatesAutoresizingMaskIntoConstraints = false
+        thumbImage.contentMode = .scaleAspectFill
+        thumbImage.clipsToBounds = true
+        thumb.addSubview(thumbImage)
+        mapRecentImageView = thumbImage
+
+        let recentTitle = UILabel()
+        recentTitle.translatesAutoresizingMaskIntoConstraints = false
+        recentTitle.font = UIFont.karla(.semibold, size: 15)
+        recentTitle.textColor = UIColor(named: "DeepPineInk")
+        mapInfoCard.addSubview(recentTitle)
+        mapRecentTitleLabel = recentTitle
+
+        let recentSubtitle = UILabel()
+        recentSubtitle.translatesAutoresizingMaskIntoConstraints = false
+        recentSubtitle.font = UIFont.karla(.regular, size: 13)
+        recentSubtitle.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.50)
+        mapInfoCard.addSubview(recentSubtitle)
+        mapRecentSubtitleLabel = recentSubtitle
+
+        NSLayoutConstraint.activate([
+            mapInfoCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            mapInfoCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            mapInfoCard.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -(islandClearance + 6)),
+
+            titleLabel.topAnchor.constraint(equalTo: mapInfoCard.topAnchor, constant: 18),
+            titleLabel.leadingAnchor.constraint(equalTo: mapInfoCard.leadingAnchor, constant: 18),
+            titleLabel.trailingAnchor.constraint(equalTo: mapInfoCard.trailingAnchor, constant: -18),
+
+            pinsLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            pinsLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            pinsLabel.trailingAnchor.constraint(equalTo: mapInfoCard.trailingAnchor, constant: -18),
+
+            divider.topAnchor.constraint(equalTo: pinsLabel.bottomAnchor, constant: 14),
+            divider.leadingAnchor.constraint(equalTo: mapInfoCard.leadingAnchor, constant: 18),
+            divider.trailingAnchor.constraint(equalTo: mapInfoCard.trailingAnchor, constant: -18),
+            divider.heightAnchor.constraint(equalToConstant: 0.5),
+
+            thumb.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 14),
+            thumb.leadingAnchor.constraint(equalTo: mapInfoCard.leadingAnchor, constant: 18),
+            thumb.widthAnchor.constraint(equalToConstant: 48),
+            thumb.heightAnchor.constraint(equalToConstant: 48),
+            thumb.bottomAnchor.constraint(equalTo: mapInfoCard.bottomAnchor, constant: -18),
+
+            thumbImage.topAnchor.constraint(equalTo: thumb.topAnchor),
+            thumbImage.bottomAnchor.constraint(equalTo: thumb.bottomAnchor),
+            thumbImage.leadingAnchor.constraint(equalTo: thumb.leadingAnchor),
+            thumbImage.trailingAnchor.constraint(equalTo: thumb.trailingAnchor),
+
+            recentTitle.leadingAnchor.constraint(equalTo: thumb.trailingAnchor, constant: 12),
+            recentTitle.topAnchor.constraint(equalTo: thumb.topAnchor, constant: -2),
+            recentTitle.trailingAnchor.constraint(equalTo: mapInfoCard.trailingAnchor, constant: -18),
+
+            recentSubtitle.leadingAnchor.constraint(equalTo: recentTitle.leadingAnchor),
+            recentSubtitle.topAnchor.constraint(equalTo: recentTitle.bottomAnchor, constant: 2),
+            recentSubtitle.trailingAnchor.constraint(equalTo: mapInfoCard.trailingAnchor, constant: -18),
+        ])
+    }
+
+    // Refreshes the "Your firsts map" card's pin/city counts and most-recent-first preview.
+    private func updateMapInfoCard() {
+        guard mapInfoCard != nil else { return }
+        let places = environment.store.places
+        let cities = Set(places.compactMap { environment.store.place(for: $0.id)?.city }).count
+        mapPinsCitiesLabel.text = "\(places.count) pin\(places.count == 1 ? "" : "s") · \(cities) cit\(cities == 1 ? "y" : "ies")"
+
+        if let id = mapRecentRequestID { PHImageManager.default().cancelImageRequest(id); mapRecentRequestID = nil }
+        mapRecentImageView.image = nil
+
+        guard let mostRecent = places.max(by: { $0.firstVisitDate < $1.firstVisitDate }) else {
+            mapRecentTitleLabel.text = "No firsts yet"
+            mapRecentSubtitleLabel.text = "Get out there and explore!"
+            mapRecentThumbView.backgroundColor = UIColor(named: "DustySage")?.withAlphaComponent(0.3)
+            return
+        }
+
+        mapRecentTitleLabel.text = mostRecent.placeName
+        mapRecentSubtitleLabel.text = "first visited \(mapRecentDateFormatter.string(from: mostRecent.firstVisitDate))"
+        mapRecentThumbView.backgroundColor = cardColors[stableColorIndex(for: mostRecent.key)].0
+
+        guard let localID = mostRecent.photoLocalIDs.first,
+              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localID], options: nil).firstObject else { return }
+        let scale = traitCollection.displayScale
+        let pixelSize = CGSize(width: 48 * scale, height: 48 * scale)
+        let opts = PHImageRequestOptions()
+        opts.deliveryMode = .opportunistic
+        opts.isNetworkAccessAllowed = true
+        opts.resizeMode = .fast
+        mapRecentRequestID = PHImageManager.default().requestImage(
+            for: asset, targetSize: pixelSize, contentMode: .aspectFill, options: opts
+        ) { [weak self] image, _ in
+            DispatchQueue.main.async { self?.mapRecentImageView.image = image }
+        }
     }
 
     // Sets the map's initial region from the saved home coordinate so tiles at the
@@ -281,7 +444,7 @@ class ViewController: UIViewController {
         greetingLabel = UILabel()
         greetingLabel.translatesAutoresizingMaskIntoConstraints = false
         greetingLabel.text = currentGreeting()
-        greetingLabel.font = UIFont.fraunces(.bold, size: 26)
+        greetingLabel.font = UIFont.frauncesBoldItalic(size: 28)
         greetingLabel.textColor = UIColor(named: "FogBackground")
         greetingLabel.isUserInteractionEnabled = true
         greetingLabel.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(debugLongPress(_:))))
@@ -306,11 +469,13 @@ class ViewController: UIViewController {
 
     private func currentGreeting() -> String {
         let hour = Calendar.current.component(.hour, from: Date())
+        let timeOfDay: String
         switch hour {
-        case 0..<12: return "Good morning."
-        case 12..<17: return "Good afternoon."
-        default:      return "Good evening."
+        case 0..<12: timeOfDay = "Good morning"
+        case 12..<17: timeOfDay = "Good afternoon"
+        default:      timeOfDay = "Good evening"
         }
+        return "\(timeOfDay), \(UIDevice.current.name.components(separatedBy: "'").first ?? "there")"
     }
 
     private func formattedToday() -> String {
@@ -325,9 +490,9 @@ class ViewController: UIViewController {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: islandClearance, right: 0)
-        tableView.register(FirstCardCell.self,    forCellReuseIdentifier: FirstCardCell.identifier)
-        tableView.register(PastFirstRowCell.self, forCellReuseIdentifier: PastFirstRowCell.identifier)
-        tableView.register(ReviewCardCell.self,   forCellReuseIdentifier: ReviewCardCell.identifier)
+        tableView.register(FirstCardCell.self,       forCellReuseIdentifier: FirstCardCell.identifier)
+        tableView.register(PastFirstRowCell.self,    forCellReuseIdentifier: PastFirstRowCell.identifier)
+        tableView.register(HomeStatsFooterCell.self, forCellReuseIdentifier: HomeStatsFooterCell.identifier)
         tableView.delegate = self
         view.addSubview(tableView)
 
@@ -338,16 +503,18 @@ class ViewController: UIViewController {
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         configureDataSource()
-        buildAndAttachStatsHeader()
     }
 
     private func configureDataSource() {
         dataSource = UITableViewDiffableDataSource<FeedSection, FeedItem>(tableView: tableView) { [weak self] tableView, indexPath, item in
             guard let self else { return UITableViewCell() }
             switch item {
-            case .reviewCarousel:
-                let cell = tableView.dequeueReusableCell(withIdentifier: ReviewCardCell.identifier, for: indexPath) as! ReviewCardCell
-                cell.configure(with: self.pendingReviewItems, delegate: self)
+            case .review(let id):
+                let cell = tableView.dequeueReusableCell(withIdentifier: PastFirstRowCell.identifier, for: indexPath) as! PastFirstRowCell
+                if let candidate = self.pendingReviewItems.first(where: { $0.id == id }) {
+                    let icon = UIImage(systemName: "mappin.and.ellipse", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium))
+                    cell.configure(icon: icon, title: candidate.label, subtitle: candidate.date)
+                }
                 return cell
             case .first(let key):
                 guard let viewModel = self.viewModelsByID[key] else { return UITableViewCell() }
@@ -360,6 +527,11 @@ class ViewController: UIViewController {
                     cell.configure(with: viewModel)
                     return cell
                 }
+            case .footer:
+                let cell = tableView.dequeueReusableCell(withIdentifier: HomeStatsFooterCell.identifier, for: indexPath) as! HomeStatsFooterCell
+                cell.configure(total: self.footerTotal, thisYear: self.footerThisYear, cities: self.footerCities, year: Calendar.current.component(.year, from: Date()))
+                cell.onCollectionTapped = { print("Collection tapped") }
+                return cell
             }
         }
     }
@@ -454,26 +626,26 @@ class ViewController: UIViewController {
         addButtonContainer = UIView()
         addButtonContainer.translatesAutoresizingMaskIntoConstraints = false
         addButtonContainer.backgroundColor = .clear
-        addButtonContainer.layer.cornerRadius = 27
+        addButtonContainer.layer.cornerRadius = 14
         addButtonContainer.layer.shadowColor = UIColor.black.cgColor
         addButtonContainer.layer.shadowOpacity = 0.18
         addButtonContainer.layer.shadowOffset = CGSize(width: 0, height: 4)
         addButtonContainer.layer.shadowRadius = 10
-        addButtonContainer.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 54, height: 54), cornerRadius: 27).cgPath
+        addButtonContainer.layer.shadowPath = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 44, height: 44), cornerRadius: 14).cgPath
         view.addSubview(addButtonContainer)
 
-        // Orange-tinted Liquid Glass circle
+        // Orange-tinted Liquid Glass square
         let glassEffect = UIGlassEffect(style: .regular)
         glassEffect.tintColor = UIColor(named: "ClayAccent")
         let addGlass = UIVisualEffectView(effect: glassEffect)
         addGlass.translatesAutoresizingMaskIntoConstraints = false
-        addGlass.layer.cornerRadius = 27
+        addGlass.layer.cornerRadius = 14
         addGlass.layer.masksToBounds = true
         addButtonContainer.addSubview(addGlass)
 
         addButton = UIButton(type: .system)
         addButton.translatesAutoresizingMaskIntoConstraints = false
-        let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium))
+        let plusImage = UIImage(named: "icon-plus") ?? UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .medium))
         addButton.setImage(plusImage, for: .normal)
         addButton.tintColor = UIColor(named: "DeepPineInk")
         addButton.backgroundColor = .clear
@@ -485,8 +657,8 @@ class ViewController: UIViewController {
         NSLayoutConstraint.activate([
             addButtonContainer.centerYAnchor.constraint(equalTo: islandBar.centerYAnchor),
             addButtonContainer.leadingAnchor.constraint(equalTo: islandBar.trailingAnchor, constant: 12),
-            addButtonContainer.widthAnchor.constraint(equalToConstant: 54),
-            addButtonContainer.heightAnchor.constraint(equalToConstant: 54),
+            addButtonContainer.widthAnchor.constraint(equalToConstant: 44),
+            addButtonContainer.heightAnchor.constraint(equalToConstant: 44),
 
             addGlass.topAnchor.constraint(equalTo: addButtonContainer.topAnchor),
             addGlass.bottomAnchor.constraint(equalTo: addButtonContainer.bottomAnchor),
@@ -575,13 +747,10 @@ class ViewController: UIViewController {
         guard tab != currentTab else { return }
         currentTab = tab
 
-        if isBarHidden {
-            isBarHidden = false
-            navBarViews.forEach { $0.transform = .identity; $0.alpha = 1 }
-        }
-
         mapView.alpha                    = tab == .map ? 1.0 : 0.001
         mapView.isUserInteractionEnabled = tab == .map
+        mapTitleLabel.isHidden     = tab != .map
+        mapInfoCard.isHidden       = tab != .map
         statsView.isHidden         = tab != .stats
         discoverView.isHidden      = tab != .discover
         tableView.isHidden         = tab != .home
@@ -593,8 +762,12 @@ class ViewController: UIViewController {
         if tab == .discover {
             discoverVC.refreshIfNeeded()
         }
+        if tab == .stats {
+            statsVC.refresh()
+        }
         if tab == .map {
             refreshCoarseFirstAnnotations()
+            updateMapInfoCard()
         }
 
         updateIslandSelection()
@@ -635,110 +808,6 @@ class ViewController: UIViewController {
     @objc func statsTapped()    { switchTo(.stats) }
     @objc func mapTapped()      { switchTo(.map) }
 
-    @objc private func handleMapTap(_ gesture: UITapGestureRecognizer) {
-        guard isBarHidden else { return }
-        // Short delay lets double-tap zoom trigger regionWillChangeAnimated first,
-        // so isMapMoving is true before we decide to show.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self, self.isBarHidden, !self.isMapMoving else { return }
-            self.showBarAnimated()
-        }
-    }
-
-    private func hideBarAnimated() {
-        guard !isBarHidden else { return }
-        isBarHidden = true
-        let offscreen = CGAffineTransform(translationX: 0, y: 120)
-        // Reverse stagger: add button leaves first, island bar follows
-        let delays: [Double] = [0, 0.06]
-        for (v, delay) in zip(navBarViews.reversed(), delays) {
-            UIView.animate(withDuration: 0.48, delay: delay, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.8, options: .allowUserInteraction) {
-                v.transform = offscreen
-                v.alpha = 0
-            }
-        }
-    }
-
-    private func showBarAnimated() {
-        guard isBarHidden else { return }
-        isBarHidden = false
-        // Same spring as viewDidAppear entrance
-        let delays: [Double] = [0.06, 0.12]
-        for (v, delay) in zip(navBarViews, delays) {
-            UIView.animate(withDuration: 0.52, delay: delay, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.6, options: [.curveEaseOut, .allowUserInteraction]) {
-                v.transform = .identity
-                v.alpha = 1
-            }
-        }
-    }
-
-    // MARK: - Stats header
-
-    private func buildAndAttachStatsHeader() {
-        let container = UIView()
-        container.backgroundColor = .clear
-        container.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 84)
-
-        let card = UIView()
-        card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.13)
-        card.layer.cornerRadius = 16
-        container.addSubview(card)
-
-        func makeTile(value: String, caption: String) -> (UIView, UILabel) {
-            let tile = UIView()
-            tile.translatesAutoresizingMaskIntoConstraints = false
-            let vLabel = UILabel()
-            vLabel.translatesAutoresizingMaskIntoConstraints = false
-            vLabel.text = value
-            vLabel.font = UIFont.fraunces(.bold, size: 24)
-            vLabel.textColor = UIColor(named: "FogBackground")
-            vLabel.textAlignment = .center
-            let nLabel = UILabel()
-            nLabel.translatesAutoresizingMaskIntoConstraints = false
-            nLabel.text = caption
-            nLabel.font = UIFont.karla(.regular, size: 11)
-            nLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.52)
-            nLabel.textAlignment = .center
-            tile.addSubview(vLabel)
-            tile.addSubview(nLabel)
-            NSLayoutConstraint.activate([
-                vLabel.topAnchor.constraint(equalTo: tile.topAnchor),
-                vLabel.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
-                nLabel.topAnchor.constraint(equalTo: vLabel.bottomAnchor, constant: 2),
-                nLabel.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
-                nLabel.bottomAnchor.constraint(equalTo: tile.bottomAnchor),
-            ])
-            return (tile, vLabel)
-        }
-
-        let (totalTile, totalVal)  = makeTile(value: "—", caption: "total firsts")
-        let (monthTile, monthVal)  = makeTile(value: "—", caption: "this month")
-        let (streakTile, streakVal) = makeTile(value: "—", caption: "month streak")
-        statsTotalLabel  = totalVal
-        statsMonthLabel  = monthVal
-        statsStreakLabel = streakVal
-
-        let stack = UIStackView(arrangedSubviews: [totalTile, monthTile, streakTile])
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.axis = .horizontal
-        stack.distribution = .fillEqually
-        stack.spacing = 0
-        card.addSubview(stack)
-
-        NSLayoutConstraint.activate([
-            card.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
-            card.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
-            card.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
-            card.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
-            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
-            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
-            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-        ])
-
-        tableView.tableHeaderView = container
-    }
 
     // MARK: - Review queue helpers
 
@@ -753,52 +822,66 @@ class ViewController: UIViewController {
         return Int(hash % UInt64(cardColors.count))
     }
 
-    private func monthStreak(from places: [PlaceSummary]) -> Int {
-        guard !places.isEmpty else { return 0 }
-        let calendar = Calendar.current
-        var comps = calendar.dateComponents([.year, .month], from: Date())
-        var streak = 0
-        for _ in 0..<24 {
-            let hasPlace = places.contains { p in
-                let pc = calendar.dateComponents([.year, .month], from: p.firstVisitDate)
-                return pc.year == comps.year && pc.month == comps.month
-            }
-            if hasPlace {
-                streak += 1
-                comps.month! -= 1
-            } else { break }
-        }
-        return streak
+    // "N years ago today" for a same-day anniversary place, else the plain "most recent" label.
+    private func heroBadgeText(for place: PlaceSummary, isAnniversary: Bool) -> String {
+        guard isAnniversary else { return "Most recent first" }
+        let years = Calendar.current.dateComponents([.year], from: place.firstVisitDate, to: Date()).year ?? 0
+        return "\(years) year\(years == 1 ? "" : "s") ago today"
     }
 
-    private func updateStatsHeader(places: [PlaceSummary]) {
-        let calendar = Calendar.current
-        let thisComps = calendar.dateComponents([.year, .month], from: Date())
-        let thisMonthCount = places.filter {
-            let p = calendar.dateComponents([.year, .month], from: $0.firstVisitDate)
-            return p.year == thisComps.year && p.month == thisComps.month
-        }.count
-        let streak = monthStreak(from: places)
-        statsTotalLabel?.text  = places.isEmpty ? "—" : "\(places.count)"
-        statsMonthLabel?.text  = "\(thisMonthCount)"
-        statsStreakLabel?.text = "\(max(streak, 0))"
-    }
-
-    private func makeHeaderView(_ text: String) -> UIView {
+    private func makeHeaderView(_ text: String, badgeCount: Int? = nil) -> UIView {
         let container = UIView()
         container.backgroundColor = .clear
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.attributedText = NSAttributedString(string: text, attributes: [
-            .font: UIFont.karla(.semibold, size: 12),
-            .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
-            .kern: 1.5,
-        ])
+
+        guard let badgeCount else {
+            label.attributedText = NSAttributedString(string: text, attributes: [
+                .font: UIFont.karla(.semibold, size: 12),
+                .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.7) ?? UIColor.white,
+                .kern: 1.5,
+            ])
+            container.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+            ])
+            return container
+        }
+
+        label.text = text
+        label.font = UIFont.frauncesBoldItalic(size: 21)
+        label.textColor = UIColor(named: "FogBackground")
         container.addSubview(label)
+
+        let badge = UIView()
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badge.backgroundColor = UIColor(named: "ClayAccent")
+        badge.layer.cornerRadius = 14
+        container.addSubview(badge)
+
+        let badgeLabel = UILabel()
+        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        badgeLabel.text = "\(badgeCount)"
+        badgeLabel.font = UIFont.karla(.bold, size: 14)
+        badgeLabel.textColor = .white
+        badgeLabel.textAlignment = .center
+        badge.addSubview(badgeLabel)
+
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
-            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: badge.leadingAnchor, constant: -10),
+
+            badge.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
+            badge.centerYAnchor.constraint(equalTo: label.centerYAnchor),
+            badge.widthAnchor.constraint(equalToConstant: 28),
+            badge.heightAnchor.constraint(equalToConstant: 28),
+
+            badgeLabel.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+            badgeLabel.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
         ])
         return container
     }
@@ -808,8 +891,7 @@ class ViewController: UIViewController {
     private func applySnapshot(animatingDifferences: Bool = true) {
         let places = environment.store.places
         let pending = environment.store.pendingReview
-
-        updateStatsHeader(places: places)
+        let calendar = Calendar.current
 
         pendingReviewItems = pending.map { candidate in
             ReviewItem(
@@ -821,64 +903,76 @@ class ViewController: UIViewController {
             )
         }
 
+        let currentYear = calendar.component(.year, from: Date())
+        footerTotal = places.count
+        footerThisYear = places.filter { calendar.component(.year, from: $0.firstVisitDate) == currentYear }.count
+        footerCities = Set(places.compactMap { environment.store.place(for: $0.id)?.city }).count
+
         var snapshot = NSDiffableDataSourceSnapshot<FeedSection, FeedItem>()
         if !pending.isEmpty {
             snapshot.appendSections([.review])
-            snapshot.appendItems([.reviewCarousel], toSection: .review)
+            snapshot.appendItems(pendingReviewItems.map { .review($0.id) }, toSection: .review)
         }
 
         viewModelsByID.removeAll()
         placesByID.removeAll()
         mostRecentID = nil
 
-        guard !places.isEmpty else {
-            dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
-            return
+        if !places.isEmpty {
+            // Most recent first up top as the hero card — unless a past first happened on this same
+            // calendar day in an earlier year, in which case that anniversary takes the hero spot.
+            let sortedPlaces = places.sorted { $0.firstVisitDate > $1.firstVisitDate }
+            let today = Date()
+            let anniversaryPlace = sortedPlaces.first { place in
+                !calendar.isDate(place.firstVisitDate, inSameDayAs: today) &&
+                calendar.component(.month, from: place.firstVisitDate) == calendar.component(.month, from: today) &&
+                calendar.component(.day, from: place.firstVisitDate) == calendar.component(.day, from: today)
+            }
+            let heroPlace = anniversaryPlace ?? sortedPlaces[0]
+
+            for summary in sortedPlaces {
+                placesByID[summary.id] = summary
+                let (large, small) = cardColors[stableColorIndex(for: summary.key)]
+                viewModelsByID[summary.id] = FirstCardViewModel(
+                    title:           summary.placeName,
+                    location:        "\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s")",
+                    category:        "Place",
+                    date:            cardDateFormatter.string(from: summary.firstVisitDate),
+                    duration:        "\(summary.totalPhotoCount) photo\(summary.totalPhotoCount == 1 ? "" : "s")",
+                    photoCount:      0,
+                    extraPhotos:     max(0, summary.totalPhotoCount - 2),
+                    largePhotoColor: large,
+                    smallPhotoColor: small,
+                    photoLocalIDs:   summary.photoLocalIDs,
+                    badgeText:       summary.id == heroPlace.id ? heroBadgeText(for: heroPlace, isAnniversary: anniversaryPlace != nil) : "Most recent first"
+                )
+            }
+
+            mostRecentID = heroPlace.id
+            snapshot.appendSections([.mostRecent])
+            snapshot.appendItems([.first(heroPlace.id)], toSection: .mostRecent)
+
+            let pastPlaces = sortedPlaces.filter { $0.id != heroPlace.id }
+            var monthOrder: [Date] = []
+            var grouped: [Date: [PlaceSummary]] = [:]
+
+            for summary in pastPlaces {
+                let comps = calendar.dateComponents([.year, .month], from: summary.firstVisitDate)
+                let key   = calendar.date(from: comps)!
+                if grouped[key] == nil { grouped[key] = []; monthOrder.append(key) }
+                grouped[key]!.append(summary)
+            }
+
+            monthOrder.sort { $0 > $1 }
+            for monthKey in monthOrder {
+                let section = FeedSection.month(monthKey)
+                snapshot.appendSections([section])
+                snapshot.appendItems(grouped[monthKey]!.map { .first($0.id) }, toSection: section)
+            }
         }
 
-        // Most recent first up top as the big card; everything older is grouped by month below.
-        let sortedPlaces = places.sorted { $0.firstVisitDate > $1.firstVisitDate }
-
-        for summary in sortedPlaces {
-            placesByID[summary.id] = summary
-            let (large, small) = cardColors[stableColorIndex(for: summary.key)]
-            viewModelsByID[summary.id] = FirstCardViewModel(
-                title:           summary.placeName,
-                location:        "\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s")",
-                category:        "Place",
-                date:            cardDateFormatter.string(from: summary.firstVisitDate),
-                duration:        "\(summary.totalPhotoCount) photo\(summary.totalPhotoCount == 1 ? "" : "s")",
-                photoCount:      0,
-                extraPhotos:     max(0, summary.totalPhotoCount - 2),
-                largePhotoColor: large,
-                smallPhotoColor: small,
-                photoLocalIDs:   summary.photoLocalIDs
-            )
-        }
-
-        let mostRecent = sortedPlaces[0]
-        mostRecentID = mostRecent.id
-        snapshot.appendSections([.mostRecent])
-        snapshot.appendItems([.first(mostRecent.id)], toSection: .mostRecent)
-
-        let pastPlaces = Array(sortedPlaces.dropFirst())
-        let calendar = Calendar.current
-        var monthOrder: [Date] = []
-        var grouped: [Date: [PlaceSummary]] = [:]
-
-        for summary in pastPlaces {
-            let comps = calendar.dateComponents([.year, .month], from: summary.firstVisitDate)
-            let key   = calendar.date(from: comps)!
-            if grouped[key] == nil { grouped[key] = []; monthOrder.append(key) }
-            grouped[key]!.append(summary)
-        }
-
-        monthOrder.sort { $0 > $1 }
-        for monthKey in monthOrder {
-            let section = FeedSection.month(monthKey)
-            snapshot.appendSections([section])
-            snapshot.appendItems(grouped[monthKey]!.map { .first($0.id) }, toSection: section)
-        }
+        snapshot.appendSections([.footer])
+        snapshot.appendItems([.footer], toSection: .footer)
 
         dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
     }
@@ -907,20 +1001,8 @@ extension ViewController: ProfileViewControllerDelegate {
     }
 }
 
-extension ViewController: ReviewCardCellDelegate {
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesFor id: PersistentIdentifier) {
-        Task { await environment.store.confirmTopCandidate(forStayID: id) }
-    }
-
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoFor id: PersistentIdentifier) {
-        presentReviewSheet(for: id)
-    }
-
-    func reviewCardCell(_ cell: ReviewCardCell, didTapCardFor id: PersistentIdentifier) {
-        presentReviewSheet(for: id)
-    }
-
-    private func presentReviewSheet(for stayID: PersistentIdentifier) {
+extension ViewController {
+    fileprivate func presentReviewSheet(for stayID: PersistentIdentifier) {
         guard let candidate = environment.store.pendingReview.first(where: { $0.id == stayID }) else { return }
         let sheet = PlaceReviewSheet(candidate: candidate, store: environment.store)
         sheet.modalPresentationStyle = .pageSheet
@@ -934,14 +1016,16 @@ extension ViewController: ReviewCardCellDelegate {
 }
 
 extension ViewController: MKMapViewDelegate {
-    func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
-        guard currentTab == .map else { return }
-        isMapMoving = true
-        hideBarAnimated()
-    }
-
-    func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-        isMapMoving = false
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        guard !(annotation is MKUserLocation) else { return nil }
+        let identifier = "firstPin"
+        let pinView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+            ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+        pinView.annotation = annotation
+        pinView.markerTintColor = UIColor(named: "DeepPineInk")
+        pinView.glyphTintColor = UIColor(named: "FogBackground")
+        pinView.canShowCallout = true
+        return pinView
     }
 }
 
@@ -950,22 +1034,32 @@ extension ViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         guard let dataSource, section < dataSource.snapshot().sectionIdentifiers.count else { return nil }
         switch dataSource.snapshot().sectionIdentifiers[section] {
-        case .review:      return makeHeaderView("NEEDS YOUR INPUT")
-        case .mostRecent:  return makeHeaderView("MOST RECENT 'FIRST'")
+        case .review:      return makeHeaderView("New firsts to review", badgeCount: pendingReviewItems.count)
+        case .mostRecent:  return nil
         case .month(let date): return makeHeaderView(monthHeaderFormatter.string(from: date).uppercased())
+        case .footer:      return nil
         }
     }
 
-    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 36 }
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        guard let dataSource, section < dataSource.snapshot().sectionIdentifiers.count else { return 0 }
+        switch dataSource.snapshot().sectionIdentifiers[section] {
+        case .review: return 48
+        case .mostRecent, .footer: return 0
+        case .month: return 36
+        }
+    }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
         switch item {
-        case .reviewCarousel:
-            return
+        case .review(let id):
+            presentReviewSheet(for: id)
         case .first(let id):
             presentPlaceDetail(for: id)
+        case .footer:
+            return
         }
     }
 

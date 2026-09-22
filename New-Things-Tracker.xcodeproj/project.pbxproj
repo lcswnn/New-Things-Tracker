@@ -523,6 +523,10 @@
 				DEVELOPMENT_TEAM = FH9MRL7638;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "New-Things-Tracker/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Trod;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "New Things Tracker uses background location to detect arrivals and departures so it can suggest new firsts even when the app is closed.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "New Things Tracker needs your location to suggest firsts based on places you visit.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "New Things Tracker reads photo dates and GPS coordinates to find firsts captured in your camera roll.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -555,6 +559,10 @@
 				DEVELOPMENT_TEAM = FH9MRL7638;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "New-Things-Tracker/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Trod;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "New Things Tracker uses background location to detect arrivals and departures so it can suggest new firsts even when the app is closed.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "New Things Tracker needs your location to suggest firsts based on places you visit.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "New Things Tracker reads photo dates and GPS coordinates to find firsts captured in your camera roll.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

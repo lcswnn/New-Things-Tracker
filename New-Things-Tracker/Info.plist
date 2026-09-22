@@ -2,31 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.spot-location.New-Things-Tracker.refresh</string>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Fraunces_72pt-Regular.ttf</string>
 		<string>Fraunces_72pt-SemiBold.ttf</string>
 		<string>Fraunces_72pt-Bold.ttf</string>
+		<string>Fraunces_72pt-Italic.ttf</string>
+		<string>Fraunces_72pt-BoldItalic.ttf</string>
 		<string>Karla-Regular.ttf</string>
 		<string>Karla-Medium.ttf</string>
 		<string>Karla-SemiBold.ttf</string>
 		<string>Karla-Bold.ttf</string>
-	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>New Things Tracker needs your location to suggest firsts based on places you visit.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>New Things Tracker uses background location to detect arrivals and departures so it can suggest new firsts even when the app is closed.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>New Things Tracker reads photo dates and GPS coordinates to find firsts captured in your camera roll.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>fetch</string>
-		<string>processing</string>
-	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.spot-location.New-Things-Tracker.refresh</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
@@ -47,5 +37,11 @@
 			</array>
 		</dict>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>

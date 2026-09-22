@@ -5,11 +5,11 @@ import CoreLocation
 class DiscoverViewController: UIViewController {
 
     private var titleLabel: UILabel!
-    private var contextLabel: UILabel!
-    private var searchContainer: UIView!
+    private var subtitleLabel: UILabel!
+    private var taglineLabel: UILabel!
+    private var mainScrollView: UIScrollView!
     private var contentView: UIView!
-    private var trendingStack: UIStackView!
-    private var nearYouScrollView: UIScrollView!
+    private var resultsStack: UIStackView!
     private var nearYouStatusLabel: UILabel!
     private var categoryChips: [UIButton] = []
 
@@ -22,18 +22,16 @@ class DiscoverViewController: UIViewController {
     private var allRankedResults: [(item: MKMapItem, distance: CLLocationDistance)] = []
     private var displayedResults: [(item: MKMapItem, distance: CLLocationDistance)] = []
     private var displayedCount = 0
-    private var nearYouCardRightEdge: CGFloat = DiscoverViewController.cardLeadingInset
     private var selectedCategoryGroup: NearYouCategoryGroup = .all
     private var hasLoadedNearbyFirsts = false
     private var isLoadingNearbyFirsts = false
 
-    private static let cardWidth: CGFloat = 160
-    private static let cardHeight: CGFloat = 190
-    private static let cardGap: CGFloat = 12
-    private static let cardLeadingInset: CGFloat = 20
-    private static let batchSize = 8
+    private static let batchSize = 10
 
-    // Chip groups the user can filter "Near You" results by, mapped onto MapKit's POI categories.
+    // Chips shown on the Discover screen — a curated subset of NearYouCategoryGroup.
+    private static let displayedGroups: [NearYouCategoryGroup] = [.all, .foodAndDrink, .outdoors, .artsAndCulture]
+
+    // Chip groups the user can filter results by, mapped onto MapKit's POI categories.
     private enum NearYouCategoryGroup: String, CaseIterable {
         case all = "All"
         case foodAndDrink = "Food & Drink"
@@ -70,7 +68,7 @@ class DiscoverViewController: UIViewController {
         .skiing, .skating, .kayaking, .surfing, .swimming, .fishing, .stadium,
     ]
 
-    private let nearYouColors: [UIColor] = [
+    private let rowColors: [UIColor] = [
         UIColor(red: 0.79, green: 0.87, blue: 0.82, alpha: 1),
         UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1),
         UIColor(named: "ClayAccent")?.withAlphaComponent(0.5) ?? .orange,
@@ -84,10 +82,8 @@ class DiscoverViewController: UIViewController {
         locationManager.delegate = self
         setupScrollLayout()
         setupTitle()
-        setupSearchBar()
-        setupNearYouSection()
-        setupTrendingSection()
-        setupFriendsSection()
+        setupCategoryChips()
+        setupResultsList()
     }
 
     // MARK: - Layout shell
@@ -97,7 +93,9 @@ class DiscoverViewController: UIViewController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
+        scrollView.delegate = self
         view.addSubview(scrollView)
+        mainScrollView = scrollView
 
         contentView = UIView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
@@ -117,84 +115,45 @@ class DiscoverViewController: UIViewController {
         ])
     }
 
-    // MARK: - Title + context
+    // MARK: - Title + tagline
 
     private func setupTitle() {
         titleLabel = UILabel()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.text = "Discover"
-        titleLabel.font = UIFont.fraunces(.bold, size: 26)
+        titleLabel.font = UIFont.frauncesBoldItalic(size: 30)
         titleLabel.textColor = UIColor(named: "FogBackground")
         contentView.addSubview(titleLabel)
 
-        contextLabel = UILabel()
-        contextLabel.translatesAutoresizingMaskIntoConstraints = false
-        contextLabel.text = "Finding your location…"
-        contextLabel.font = UIFont.karla(.regular, size: 14)
-        contextLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.65)
-        contentView.addSubview(contextLabel)
+        subtitleLabel = UILabel()
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.text = "New to you, near you"
+        subtitleLabel.font = UIFont.karla(.regular, size: 15)
+        subtitleLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.70)
+        contentView.addSubview(subtitleLabel)
+
+        taglineLabel = UILabel()
+        taglineLabel.translatesAutoresizingMaskIntoConstraints = false
+        taglineLabel.text = "firsts waiting to happen"
+        taglineLabel.font = UIFont.frauncesItalic(size: 17)
+        taglineLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.85)
+        contentView.addSubview(taglineLabel)
 
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
 
-            contextLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
-            contextLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6),
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+
+            taglineLabel.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 2),
+            taglineLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
         ])
     }
 
-    // MARK: - Search bar
+    // MARK: - Category chips
 
-    private func setupSearchBar() {
-        searchContainer = UIView()
-        searchContainer.translatesAutoresizingMaskIntoConstraints = false
-        searchContainer.backgroundColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.12)
-        searchContainer.layer.cornerRadius = 14
-        contentView.addSubview(searchContainer)
-
-        let searchIcon = UIImageView(image: UIImage(systemName: "magnifyingglass"))
-        searchIcon.translatesAutoresizingMaskIntoConstraints = false
-        searchIcon.tintColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.45)
-        searchIcon.contentMode = .scaleAspectFit
-        searchContainer.addSubview(searchIcon)
-
-        let searchField = UITextField()
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.font = UIFont.karla(.regular, size: 15)
-        searchField.textColor = UIColor(named: "FogBackground")
-        searchField.tintColor = UIColor(named: "FogBackground")
-        searchField.attributedPlaceholder = NSAttributedString(
-            string: "Search places, experiences...",
-            attributes: [
-                .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.38) ?? UIColor.gray,
-                .font: UIFont.karla(.regular, size: 15)
-            ]
-        )
-        searchContainer.addSubview(searchField)
-
-        NSLayoutConstraint.activate([
-            searchContainer.topAnchor.constraint(equalTo: contextLabel.bottomAnchor, constant: 18),
-            searchContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            searchContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            searchContainer.heightAnchor.constraint(equalToConstant: 46),
-
-            searchIcon.leadingAnchor.constraint(equalTo: searchContainer.leadingAnchor, constant: 14),
-            searchIcon.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-            searchIcon.widthAnchor.constraint(equalToConstant: 17),
-            searchIcon.heightAnchor.constraint(equalToConstant: 17),
-
-            searchField.leadingAnchor.constraint(equalTo: searchIcon.trailingAnchor, constant: 9),
-            searchField.trailingAnchor.constraint(equalTo: searchContainer.trailingAnchor, constant: -14),
-            searchField.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor),
-        ])
-    }
-
-    // MARK: - Near You
-
-    private func setupNearYouSection() {
-        let sectionLabel = makeSectionHeader("Near You")
-        contentView.addSubview(sectionLabel)
-
+    private func setupCategoryChips() {
         let chipsScrollView = UIScrollView()
         chipsScrollView.translatesAutoresizingMaskIntoConstraints = false
         chipsScrollView.showsHorizontalScrollIndicator = false
@@ -207,7 +166,7 @@ class DiscoverViewController: UIViewController {
         chipsStack.spacing = 8
         chipsScrollView.addSubview(chipsStack)
 
-        for group in NearYouCategoryGroup.allCases {
+        for group in Self.displayedGroups {
             let chip = makeCategoryChip(title: group.rawValue)
             chipsStack.addArrangedSubview(chip)
             categoryChips.append(chip)
@@ -216,67 +175,37 @@ class DiscoverViewController: UIViewController {
             styleChip(chip, selected: index == 0)
         }
 
-        let scrollView = UIScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.alwaysBounceHorizontal = true
-        scrollView.clipsToBounds = false
-        scrollView.delegate = self
-        contentView.addSubview(scrollView)
-        nearYouScrollView = scrollView
-
-        let statusLabel = UILabel()
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        statusLabel.font = UIFont.karla(.regular, size: 14)
-        statusLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.5)
-        statusLabel.numberOfLines = 0
-        statusLabel.text = "Finding nearby firsts…"
-        contentView.addSubview(statusLabel)
-        nearYouStatusLabel = statusLabel
-
         NSLayoutConstraint.activate([
-            sectionLabel.topAnchor.constraint(equalTo: searchContainer.bottomAnchor, constant: 30),
-            sectionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            chipsScrollView.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 12),
+            chipsScrollView.topAnchor.constraint(equalTo: taglineLabel.bottomAnchor, constant: 22),
             chipsScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             chipsScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            chipsScrollView.heightAnchor.constraint(equalToConstant: 34),
+            chipsScrollView.heightAnchor.constraint(equalToConstant: 40),
 
             chipsStack.topAnchor.constraint(equalTo: chipsScrollView.topAnchor),
             chipsStack.bottomAnchor.constraint(equalTo: chipsScrollView.bottomAnchor),
             chipsStack.leadingAnchor.constraint(equalTo: chipsScrollView.leadingAnchor, constant: 20),
             chipsStack.trailingAnchor.constraint(equalTo: chipsScrollView.trailingAnchor, constant: -20),
             chipsStack.heightAnchor.constraint(equalTo: chipsScrollView.heightAnchor),
-
-            scrollView.topAnchor.constraint(equalTo: chipsScrollView.bottomAnchor, constant: 12),
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            scrollView.heightAnchor.constraint(equalToConstant: 200),
-
-            statusLabel.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 8),
-            statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
         ])
 
-        // Keep a reference so Trending can anchor below
-        scrollView.tag = 100
+        // Anchor the results list below the chips row
+        chipsScrollView.tag = 100
     }
 
     private func makeCategoryChip(title: String) -> UIButton {
         var config = UIButton.Configuration.plain()
         config.title = title
-        config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = UIFont.karla(.semibold, size: 13)
+            outgoing.font = UIFont.karla(.semibold, size: 14)
             return outgoing
         }
         let button = UIButton(configuration: config)
         // The pill shape lives on the button's own layer rather than config.background — the
         // configuration-driven background view doesn't reliably render until the configuration is
         // reapplied after layout, which is why the pill was only appearing after a tap.
-        button.layer.cornerRadius = 16
+        button.layer.cornerRadius = 18
         button.layer.masksToBounds = true
         button.addTarget(self, action: #selector(categoryChipTapped(_:)), for: .touchUpInside)
         return button
@@ -288,18 +217,50 @@ class DiscoverViewController: UIViewController {
         chip.configuration = config
         chip.backgroundColor = selected
             ? UIColor(named: "ClayAccent")
-            : UIColor(named: "FogBackground")?.withAlphaComponent(0.7)
+            : UIColor(named: "FogBackground")?.withAlphaComponent(0.85)
     }
 
     @objc private func categoryChipTapped(_ sender: UIButton) {
         guard let index = categoryChips.firstIndex(of: sender) else { return }
-        let group = NearYouCategoryGroup.allCases[index]
+        let group = Self.displayedGroups[index]
         guard group != selectedCategoryGroup else { return }
         selectedCategoryGroup = group
         for (i, chip) in categoryChips.enumerated() {
             styleChip(chip, selected: i == index)
         }
         applyCategoryFilterAndDisplay()
+    }
+
+    // MARK: - Results list
+
+    private func setupResultsList() {
+        guard let chipsScroll = contentView.viewWithTag(100) else { return }
+
+        let statusLabel = UILabel()
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.font = UIFont.karla(.regular, size: 14)
+        statusLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.55)
+        statusLabel.numberOfLines = 0
+        statusLabel.text = "Finding nearby firsts…"
+        contentView.addSubview(statusLabel)
+        nearYouStatusLabel = statusLabel
+
+        resultsStack = UIStackView()
+        resultsStack.translatesAutoresizingMaskIntoConstraints = false
+        resultsStack.axis = .vertical
+        resultsStack.spacing = 14
+        contentView.addSubview(resultsStack)
+
+        NSLayoutConstraint.activate([
+            statusLabel.topAnchor.constraint(equalTo: chipsScroll.bottomAnchor, constant: 24),
+            statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+
+            resultsStack.topAnchor.constraint(equalTo: chipsScroll.bottomAnchor, constant: 24),
+            resultsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            resultsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            resultsStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+        ])
     }
 
     // MARK: - Nearby-firsts pipeline (public API for the parent view controller)
@@ -420,7 +381,6 @@ class DiscoverViewController: UIViewController {
         guard !mapItems.isEmpty else {
             allRankedResults = []
             showNearYouMessage("No new places to discover nearby yet.")
-            updateContextLabel(origin: origin, count: 0)
             return
         }
 
@@ -440,7 +400,6 @@ class DiscoverViewController: UIViewController {
             }
             .sorted { $0.distance < $1.distance }
 
-        updateContextLabel(origin: origin, count: allRankedResults.count)
         applyCategoryFilterAndDisplay()
     }
 
@@ -466,24 +425,8 @@ class DiscoverViewController: UIViewController {
         beginDisplayingResults(filtered)
     }
 
-    private func updateContextLabel(origin: CLLocationCoordinate2D, count: Int) {
-        let location = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
-        CLGeocoder().reverseGeocodeLocation(location) { [weak self] placemarks, _ in
-            guard let self else { return }
-            let place = placemarks?.first
-            let locationText = [place?.locality ?? place?.subAdministrativeArea, place?.administrativeArea]
-                .compactMap { $0 }
-                .joined(separator: ", ")
-
-            DispatchQueue.main.async {
-                let countText = "\(count) new thing\(count == 1 ? "" : "s") to try nearby"
-                self.contextLabel.text = locationText.isEmpty ? countText : "\(locationText)  ·  \(countText)"
-            }
-        }
-    }
-
     private func showNearYouMessage(_ text: String) {
-        nearYouScrollView.subviews.forEach { $0.removeFromSuperview() }
+        resultsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         nearbyMapItems = []
         displayedResults = []
         displayedCount = 0
@@ -491,17 +434,15 @@ class DiscoverViewController: UIViewController {
         nearYouStatusLabel.isHidden = false
     }
 
-    // Starts a fresh "endless" browsing session over `results`: cards are revealed in small batches
+    // Starts a fresh "endless" browsing session over `results`: rows are revealed in small batches
     // as the user scrolls rather than all at once, so it feels like a continuous stream of places.
     private func beginDisplayingResults(_ results: [(item: MKMapItem, distance: CLLocationDistance)]) {
         nearYouStatusLabel.isHidden = true
-        nearYouScrollView.subviews.forEach { $0.removeFromSuperview() }
+        resultsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         displayedResults = results
         displayedCount = 0
         nearbyMapItems = []
-        nearYouCardRightEdge = Self.cardLeadingInset
-        nearYouScrollView.contentSize = CGSize(width: 0, height: Self.cardHeight)
 
         appendNextBatch()
     }
@@ -515,23 +456,22 @@ class DiscoverViewController: UIViewController {
             let index = nearbyMapItems.count
             nearbyMapItems.append(result.item)
 
-            let color = nearYouColors[index % nearYouColors.count]
-            let distanceText = distanceFormatter.string(fromDistance: result.distance) + " away"
-            let card = makeNearYouCard(
-                title: result.item.name ?? "Somewhere new", distance: distanceText, color: color,
-                icon: iconName(for: result.item.pointOfInterestCategory),
-                width: Self.cardWidth, height: Self.cardHeight
+            let color = rowColors[index % rowColors.count]
+            let distanceText = distanceFormatter.string(fromDistance: result.distance)
+            let row = makeDiscoverRow(
+                title: result.item.name ?? "Somewhere new",
+                category: groupLabel(for: result.item.pointOfInterestCategory),
+                distance: distanceText,
+                color: color,
+                icon: iconName(for: result.item.pointOfInterestCategory)
             )
-            card.frame = CGRect(x: nearYouCardRightEdge, y: 0, width: Self.cardWidth, height: Self.cardHeight)
-            card.tag = index
-            card.isUserInteractionEnabled = true
-            card.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(nearYouCardTapped(_:))))
-            nearYouScrollView.addSubview(card)
-            nearYouCardRightEdge += Self.cardWidth + Self.cardGap
+            row.tag = index
+            row.isUserInteractionEnabled = true
+            row.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(discoverRowTapped(_:))))
+            resultsStack.addArrangedSubview(row)
         }
 
         displayedCount = end
-        nearYouScrollView.contentSize = CGSize(width: nearYouCardRightEdge - Self.cardGap + Self.cardLeadingInset, height: Self.cardHeight)
     }
 
     // A category-matched SF Symbol instead of a photo — no risk of showing the wrong building/business
@@ -578,306 +518,106 @@ class DiscoverViewController: UIViewController {
         }
     }
 
-    @objc private func nearYouCardTapped(_ gesture: UITapGestureRecognizer) {
+    // Human-readable category name for the row subtitle — the group that owns this POI category,
+    // falling back to "Nearby" for anything outside the curated chip groups (e.g. Fun & Nightlife).
+    private func groupLabel(for category: MKPointOfInterestCategory?) -> String {
+        guard let category else { return "Nearby" }
+        for group in NearYouCategoryGroup.allCases where group != .all {
+            if group.categories?.contains(category) == true { return group.rawValue }
+        }
+        return "Nearby"
+    }
+
+    @objc private func discoverRowTapped(_ gesture: UITapGestureRecognizer) {
         guard let tag = gesture.view?.tag, tag < nearbyMapItems.count else { return }
         let detailVC = MKMapItemDetailViewController(mapItem: nearbyMapItems[tag])
         detailVC.delegate = self
         present(detailVC, animated: true)
     }
 
-    // MARK: - Trending
+    // MARK: - Row builder
 
-    private func setupTrendingSection() {
-        guard let nearYouScroll = contentView.viewWithTag(100) else { return }
-
-        let sectionLabel = makeSectionHeader("Trending in Chicago")
-        contentView.addSubview(sectionLabel)
-
-        let trending: [(rank: Int, title: String, category: String, count: String)] = [
-            (1, "Kayaking on Lake Michigan",    "Adventure", "234 people this week"),
-            (2, "Architecture Boat Tour",       "Culture",   "189 people this week"),
-            (3, "Deep Dish Pizza Making Class", "Food",      "156 people this week"),
-        ]
-
-        trendingStack = UIStackView()
-        trendingStack.translatesAutoresizingMaskIntoConstraints = false
-        trendingStack.axis = .vertical
-        trendingStack.spacing = 10
-        contentView.addSubview(trendingStack)
-
-        for item in trending {
-            trendingStack.addArrangedSubview(makeTrendingRow(rank: item.rank, title: item.title, category: item.category, count: item.count))
-        }
-
-        NSLayoutConstraint.activate([
-            sectionLabel.topAnchor.constraint(equalTo: nearYouScroll.bottomAnchor, constant: 34),
-            sectionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            trendingStack.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 14),
-            trendingStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            trendingStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-        ])
-    }
-
-    // MARK: - Helpers
-
-    private func makeSectionHeader(_ text: String) -> UILabel {
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = text
-        label.font = UIFont.fraunces(.bold, size: 20)
-        label.textColor = UIColor(named: "FogBackground")
-        return label
-    }
-
-    private func makeNearYouCard(title: String, distance: String, color: UIColor, icon: String, width: CGFloat, height: CGFloat) -> UIView {
+    private func makeDiscoverRow(title: String, category: String, distance: String, color: UIColor, icon: String) -> UIView {
         let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
         card.backgroundColor = UIColor(named: "FogBackground")
-        card.layer.cornerRadius = 18
+        card.layer.cornerRadius = 20
         card.layer.shadowColor = UIColor.black.cgColor
         card.layer.shadowOpacity = 0.10
         card.layer.shadowOffset = CGSize(width: 0, height: 3)
         card.layer.shadowRadius = 8
 
-        let photoH = height * 0.58
-        let photoView = UIView()
-        photoView.backgroundColor = color
-        photoView.frame = CGRect(x: 0, y: 0, width: width, height: photoH)
-        photoView.layer.cornerRadius = 18
-        photoView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        photoView.clipsToBounds = true
-        card.addSubview(photoView)
+        let thumb = UIView()
+        thumb.translatesAutoresizingMaskIntoConstraints = false
+        thumb.backgroundColor = color
+        thumb.layer.cornerRadius = 16
+        thumb.clipsToBounds = true
+        card.addSubview(thumb)
 
-        // A category icon instead of a photo — set once, synchronously, no network fetch involved.
-        let iconView = UIImageView(image: UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .medium)))
-        iconView.frame = photoView.bounds
-        iconView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        let iconView = UIImageView(image: UIImage(systemName: icon, withConfiguration: UIImage.SymbolConfiguration(pointSize: 26, weight: .medium)))
+        iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.contentMode = .center
         iconView.tintColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.55)
-        photoView.addSubview(iconView)
+        thumb.addSubview(iconView)
 
-        let labelY = photoH + 10
-        let titleLabel = UILabel()
-        titleLabel.font = UIFont.fraunces(.bold, size: 14)
-        titleLabel.textColor = UIColor(named: "DeepPineInk")
-        titleLabel.text = title
-        titleLabel.numberOfLines = 2
-        titleLabel.frame = CGRect(x: 12, y: labelY, width: width - 24, height: 38)
-        card.addSubview(titleLabel)
-
-        let distLabel = UILabel()
-        distLabel.font = UIFont.karla(.regular, size: 11)
-        distLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.45)
-        distLabel.text = distance
-        distLabel.frame = CGRect(x: 12, y: labelY + 40, width: width - 24, height: 16)
-        card.addSubview(distLabel)
-
-        return card
-    }
-
-    private func makeTrendingRow(rank: Int, title: String, category: String, count: String) -> UIView {
-        let card = UIView()
-        card.translatesAutoresizingMaskIntoConstraints = false
-        card.backgroundColor = UIColor(named: "FogBackground")
-        card.layer.cornerRadius = 14
-        card.layer.shadowColor = UIColor.black.cgColor
-        card.layer.shadowOpacity = 0.07
-        card.layer.shadowOffset = CGSize(width: 0, height: 2)
-        card.layer.shadowRadius = 6
-
-        // Rank number
-        let rankLabel = UILabel()
-        rankLabel.translatesAutoresizingMaskIntoConstraints = false
-        rankLabel.text = "\(rank)"
-        rankLabel.font = UIFont.fraunces(.bold, size: 22)
-        rankLabel.textColor = rank <= 3
-            ? UIColor(named: "ClayAccent")
-            : UIColor(named: "DeepPineInk")?.withAlphaComponent(0.25)
-        rankLabel.textAlignment = .center
-        rankLabel.setContentHuggingPriority(.required, for: .horizontal)
-        card.addSubview(rankLabel)
-
-        // Text stack
-        let titleLabel = UILabel()
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = title
-        titleLabel.font = UIFont.fraunces(.bold, size: 15)
-        titleLabel.textColor = UIColor(named: "DeepPineInk")
-        titleLabel.numberOfLines = 2
-
-        let countLabel = UILabel()
-        countLabel.translatesAutoresizingMaskIntoConstraints = false
-        countLabel.text = count
-        countLabel.font = UIFont.karla(.regular, size: 12)
-        countLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.45)
-
-        let textStack = UIStackView(arrangedSubviews: [titleLabel, countLabel])
-        textStack.translatesAutoresizingMaskIntoConstraints = false
-        textStack.axis = .vertical
-        textStack.spacing = 3
-        card.addSubview(textStack)
-
-        // Category pill
         let pill = UIView()
         pill.translatesAutoresizingMaskIntoConstraints = false
-        pill.backgroundColor = UIColor(named: "DustySage")?.withAlphaComponent(0.45)
-        pill.layer.cornerRadius = 10
-        pill.setContentHuggingPriority(.required, for: .horizontal)
+        pill.backgroundColor = UIColor(named: "ClayAccent")
+        pill.layer.cornerRadius = 13
         card.addSubview(pill)
 
         let pillLabel = UILabel()
         pillLabel.translatesAutoresizingMaskIntoConstraints = false
-        pillLabel.text = category
-        pillLabel.font = UIFont.karla(.semibold, size: 11)
-        pillLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.7)
+        pillLabel.text = "Not yet visited"
+        pillLabel.font = UIFont.karla(.semibold, size: 12)
+        pillLabel.textColor = UIColor(named: "FogBackground")
         pill.addSubview(pillLabel)
 
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = title
+        titleLabel.font = UIFont.fraunces(.bold, size: 19)
+        titleLabel.textColor = UIColor(named: "DeepPineInk")
+        titleLabel.numberOfLines = 2
+        card.addSubview(titleLabel)
+
+        let subtitleLabel = UILabel()
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.text = "\(category) · \(distance)"
+        subtitleLabel.font = UIFont.karla(.regular, size: 13)
+        subtitleLabel.textColor = UIColor(named: "DeepPineInk")?.withAlphaComponent(0.50)
+        card.addSubview(subtitleLabel)
+
         NSLayoutConstraint.activate([
-            rankLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            rankLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
-            rankLabel.widthAnchor.constraint(equalToConstant: 28),
+            thumb.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            thumb.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            thumb.widthAnchor.constraint(equalToConstant: 88),
+            thumb.heightAnchor.constraint(equalToConstant: 88),
 
-            textStack.leadingAnchor.constraint(equalTo: rankLabel.trailingAnchor, constant: 12),
-            textStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 14),
-            textStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -14),
-            textStack.trailingAnchor.constraint(lessThanOrEqualTo: pill.leadingAnchor, constant: -10),
+            iconView.centerXAnchor.constraint(equalTo: thumb.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: thumb.centerYAnchor),
 
-            // Pill: sized to its content, anchored to trailing edge only
-            pill.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -14),
-            pill.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            pill.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            pill.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
 
-            pillLabel.topAnchor.constraint(equalTo: pill.topAnchor, constant: 5),
-            pillLabel.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -5),
+            pillLabel.topAnchor.constraint(equalTo: pill.topAnchor, constant: 6),
+            pillLabel.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -6),
             pillLabel.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 10),
             pillLabel.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -10),
+
+            titleLabel.leadingAnchor.constraint(equalTo: thumb.trailingAnchor, constant: 14),
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: pill.leadingAnchor, constant: -8),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6),
+            subtitleLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+
+            card.bottomAnchor.constraint(greaterThanOrEqualTo: thumb.bottomAnchor, constant: 16),
+            card.bottomAnchor.constraint(greaterThanOrEqualTo: subtitleLabel.bottomAnchor, constant: 16),
         ])
 
-        card.heightAnchor.constraint(greaterThanOrEqualToConstant: 70).isActive = true
         return card
-    }
-
-    // MARK: - Friends' Firsts
-
-    private func setupFriendsSection() {
-        let sectionLabel = makeSectionHeader("Friends' Firsts")
-        contentView.addSubview(sectionLabel)
-
-        let friends: [(initials: String, name: String, activity: String, time: String, color: UIColor)] = [
-            ("SM", "Sarah M.",  "hiked the lakefront trail",       "2h ago",    UIColor(red: 0.85, green: 0.73, blue: 0.70, alpha: 1)),
-            ("JT", "Jake T.",   "tried Ethiopian food",            "Yesterday", UIColor(red: 0.70, green: 0.80, blue: 0.76, alpha: 1)),
-            ("MR", "Maya R.",   "went to an improv show",          "3d ago",    UIColor(red: 0.79, green: 0.75, blue: 0.88, alpha: 1)),
-        ]
-
-        let stack = UIStackView()
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.axis = .vertical
-        stack.spacing = 10
-        contentView.addSubview(stack)
-
-        for friend in friends {
-            stack.addArrangedSubview(makeFriendRow(
-                initials: friend.initials,
-                name: friend.name,
-                activity: friend.activity,
-                time: friend.time,
-                avatarColor: friend.color
-            ))
-        }
-
-        NSLayoutConstraint.activate([
-            sectionLabel.topAnchor.constraint(equalTo: trendingStack.bottomAnchor, constant: 34),
-            sectionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            stack.topAnchor.constraint(equalTo: sectionLabel.bottomAnchor, constant: 14),
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-        ])
-    }
-
-    private func makeFriendRow(initials: String, name: String, activity: String, time: String, avatarColor: UIColor) -> UIView {
-        let row = UIView()
-        row.translatesAutoresizingMaskIntoConstraints = false
-
-        // Avatar circle
-        let avatar = UIView()
-        avatar.translatesAutoresizingMaskIntoConstraints = false
-        avatar.backgroundColor = avatarColor
-        avatar.layer.cornerRadius = 22
-        row.addSubview(avatar)
-
-        let initialsLabel = UILabel()
-        initialsLabel.translatesAutoresizingMaskIntoConstraints = false
-        initialsLabel.text = initials
-        initialsLabel.font = UIFont.karla(.bold, size: 13)
-        initialsLabel.textColor = .white
-        initialsLabel.textAlignment = .center
-        avatar.addSubview(initialsLabel)
-
-        // Name + activity text
-        let nameLabel = UILabel()
-        nameLabel.translatesAutoresizingMaskIntoConstraints = false
-        nameLabel.text = name
-        nameLabel.font = UIFont.karla(.bold, size: 14)
-        nameLabel.textColor = UIColor(named: "FogBackground")
-
-        // Attributed activity string: "first time" in italic Fraunces, activity in regular
-        let activityText = NSMutableAttributedString(
-            string: "first time · ",
-            attributes: [
-                .font: UIFont.fraunces(.bold, size: 13),
-                .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.55) ?? UIColor.gray
-            ]
-        )
-        activityText.append(NSAttributedString(
-            string: activity,
-            attributes: [
-                .font: UIFont.karla(.regular, size: 13),
-                .foregroundColor: UIColor(named: "FogBackground")?.withAlphaComponent(0.80) ?? UIColor.gray
-            ]
-        ))
-        let activityLabel = UILabel()
-        activityLabel.translatesAutoresizingMaskIntoConstraints = false
-        activityLabel.attributedText = activityText
-        activityLabel.numberOfLines = 2
-
-        let textStack = UIStackView(arrangedSubviews: [nameLabel, activityLabel])
-        textStack.translatesAutoresizingMaskIntoConstraints = false
-        textStack.axis = .vertical
-        textStack.spacing = 3
-        row.addSubview(textStack)
-
-        // Time label
-        let timeLabel = UILabel()
-        timeLabel.translatesAutoresizingMaskIntoConstraints = false
-        timeLabel.text = time
-        timeLabel.font = UIFont.karla(.regular, size: 11)
-        timeLabel.textColor = UIColor(named: "FogBackground")?.withAlphaComponent(0.40)
-        timeLabel.setContentHuggingPriority(.required, for: .horizontal)
-        timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-        row.addSubview(timeLabel)
-
-        NSLayoutConstraint.activate([
-            avatar.leadingAnchor.constraint(equalTo: row.leadingAnchor),
-            avatar.centerYAnchor.constraint(equalTo: row.centerYAnchor),
-            avatar.widthAnchor.constraint(equalToConstant: 44),
-            avatar.heightAnchor.constraint(equalToConstant: 44),
-
-            initialsLabel.centerXAnchor.constraint(equalTo: avatar.centerXAnchor),
-            initialsLabel.centerYAnchor.constraint(equalTo: avatar.centerYAnchor),
-
-            textStack.leadingAnchor.constraint(equalTo: avatar.trailingAnchor, constant: 12),
-            textStack.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
-            textStack.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
-            textStack.trailingAnchor.constraint(lessThanOrEqualTo: timeLabel.leadingAnchor, constant: -8),
-
-            timeLabel.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            timeLabel.centerYAnchor.constraint(equalTo: row.centerYAnchor),
-
-            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 52),
-        ])
-
-        return row
     }
 }
 
@@ -910,12 +650,12 @@ extension DiscoverViewController: CLLocationManagerDelegate {
 // MARK: - UIScrollViewDelegate
 
 extension DiscoverViewController: UIScrollViewDelegate {
-    // Reveals the next batch of "Near You" cards as the user approaches the trailing edge,
-    // so the row keeps feeding fresh places instead of stopping at a hard cutoff.
+    // Reveals the next batch of results as the user approaches the bottom of the page, so the
+    // list keeps feeding fresh places instead of stopping at a hard cutoff.
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView === nearYouScrollView else { return }
-        let threshold: CGFloat = 400
-        if scrollView.contentOffset.x + scrollView.bounds.width > scrollView.contentSize.width - threshold {
+        guard scrollView === mainScrollView else { return }
+        let threshold: CGFloat = 500
+        if scrollView.contentOffset.y + scrollView.bounds.height > scrollView.contentSize.height - threshold {
             appendNextBatch()
         }
     }
