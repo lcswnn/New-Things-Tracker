@@ -17,7 +17,7 @@ class ProfileViewController: UIViewController {
     private let photoImageView = UIImageView()
     private var locationsSubtitleLabel: UILabel!
 
-    var placeCandidates: [PlaceCandidate] = []
+    var placeCandidates: [PlaceSummary] = []
 
     private let gridColors: [UIColor] = [
         UIColor(red: 0.88, green: 0.78, blue: 0.72, alpha: 1),
@@ -398,7 +398,7 @@ class ProfileViewController: UIViewController {
         return vStack
     }
 
-    private func makeGridCell(_ candidate: PlaceCandidate, color: UIColor) -> UIView {
+    private func makeGridCell(_ candidate: PlaceSummary, color: UIColor) -> UIView {
         let card = UIView()
         card.backgroundColor    = color
         card.layer.cornerRadius = 16
@@ -421,7 +421,7 @@ class ProfileViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text          = candidate.placeName ?? "…"
+        titleLabel.text          = candidate.placeName
         titleLabel.font          = .fraunces(.regular, size: 14)
         titleLabel.textColor     = UIColor(named: "FogBackground")
         titleLabel.numberOfLines = 2

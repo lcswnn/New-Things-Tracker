@@ -21,6 +21,12 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.spot-location.New-Things-Tracker.refresh</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

@@ -1,14 +1,18 @@
 import UIKit
 import Photos
+import SwiftData
 
 class PlaceDetailViewController: UIViewController {
 
-    private let candidate: PlaceCandidate
+    private let placeID: PersistentIdentifier
+    private let store: FirstsStore
+    private var summary: PlaceSummary!
     private var collectionView: UICollectionView!
     private var photoAssets: [PHAsset] = []
 
-    init(candidate: PlaceCandidate) {
-        self.candidate = candidate
+    init(placeID: PersistentIdentifier, store: FirstsStore) {
+        self.placeID = placeID
+        self.store = store
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -17,6 +21,8 @@ class PlaceDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor(named: "DustySage")
+        guard let place = store.place(for: placeID) else { return }
+        summary = PlaceSummary(place: place)
         setupCollectionView()
         loadAssets()
     }
@@ -76,7 +82,7 @@ class PlaceDetailViewController: UIViewController {
     // MARK: - Asset loading
 
     private func loadAssets() {
-        let ids = candidate.photoLocalIDs
+        let ids = summary.photoLocalIDs
         guard !ids.isEmpty else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let opts = PHFetchOptions()
@@ -118,7 +124,7 @@ extension PlaceDetailViewController: UICollectionViewDataSource {
             withReuseIdentifier: PlaceDetailHeader.reuseID,
             for: indexPath
         ) as! PlaceDetailHeader
-        header.configure(with: candidate)
+        header.configure(with: summary)
         return header
     }
 }
@@ -182,10 +188,10 @@ class PlaceDetailHeader: UICollectionReusableView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(with candidate: PlaceCandidate) {
-        titleLabel.text = candidate.placeName ?? "…"
-        dateLabel.text  = "First visited \(dateFmt.string(from: candidate.firstVisitDate))"
-        let v = candidate.visitCount, p = candidate.totalPhotoCount
+    func configure(with summary: PlaceSummary) {
+        titleLabel.text = summary.placeName
+        dateLabel.text  = "First visited \(dateFmt.string(from: summary.firstVisitDate))"
+        let v = summary.visitCount, p = summary.totalPhotoCount
         statsLabel.text = "\(v) day\(v == 1 ? "" : "s") visited · \(p) photo\(p == 1 ? "" : "s")"
     }
 }

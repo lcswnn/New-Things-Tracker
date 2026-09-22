@@ -14,6 +14,10 @@ class LocationHistoryManager: NSObject, ObservableObject {
     @Published var visits: [LocationVisit] = []
     @Published var log: [String] = []
 
+    // Set by ViewController to persist every CLVisit into the Firsts store as it arrives — visit
+    // data is the one unrecoverable log in the schema, so it's written immediately, not batched.
+    var onVisit: ((LocationVisit) -> Void)?
+
     private let manager = CLLocationManager()
 
     override init() {
@@ -101,7 +105,10 @@ extension LocationHistoryManager: CLLocationManagerDelegate {
             coordinate: visit.coordinate,
             horizontalAccuracy: visit.horizontalAccuracy
         )
-        DispatchQueue.main.async { self.visits.append(item) }
+        DispatchQueue.main.async {
+            self.visits.append(item)
+            self.onVisit?(item)
+        }
 
         let arrStr = visit.arrivalDate == .distantPast
             ? "unknown arrival"

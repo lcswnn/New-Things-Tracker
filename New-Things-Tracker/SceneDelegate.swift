@@ -17,6 +17,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
         guard let _ = (scene as? UIWindowScene) else { return }
+
+        // Main.storyboard's root is a UINavigationController wrapping ViewController. ViewController
+        // has no init injection seam (it's storyboard-instantiated), so property injection here is
+        // the seam instead. ViewController must not read this until viewDidAppear — UIKit may call
+        // viewDidLoad before this method runs.
+        let navigationController = window?.rootViewController as? UINavigationController
+        (navigationController?.viewControllers.first as? ViewController)?.environment = AppDelegate.environment
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -45,6 +52,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
+
+        // BGProcessingTaskRequest is one-shot and gets consumed once the system runs it (or if the
+        // app is force-quit), so re-submit every time the app backgrounds to keep a request pending.
+        RefreshScheduler.scheduleNext()
     }
 
 

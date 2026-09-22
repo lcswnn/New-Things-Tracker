@@ -10,10 +10,14 @@ import UIKit
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
-
+    // Set once here and property-injected into ViewController by SceneDelegate.
+    static private(set) var environment: AppEnvironment!
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        Self.environment = AppEnvironment.bootstrap()
+        // Must complete before this method returns — registering the same identifier twice
+        // (e.g. on a later, unrelated call) would terminate the app, hence the isRegistered guard.
+        RefreshScheduler.registerHandlers(store: Self.environment.store)
         return true
     }
 

@@ -3,34 +3,25 @@ import CoreLocation
 
 struct WiringTestView: View {
 
-    @StateObject private var loc   = LocationHistoryManager()
-    @StateObject private var photo = PhotoMetadataManager()
+    @StateObject private var loc = LocationHistoryManager()
+    @ObservedObject private var store: FirstsStore
 
     @State private var mergedLog: [(id: Int, line: String)] = []
     @State private var logCounter = 0
-    @State private var selectedTab = 0   // 0 = Log, 1 = Clusters, 2 = Firsts
+    @State private var selectedTab = 0   // 0 = Log, 1 = Places, 2 = Review
+
+    init(environment: AppEnvironment) {
+        _store = ObservedObject(wrappedValue: environment.store)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
 
             // — Stats chips —
             HStack(spacing: 0) {
-                chip(value: "\(loc.visits.count)",
-                     label: "visits",
-                     icon: "mappin.circle.fill",
-                     color: .blue)
-                chip(value: "\(photo.items.count)",
-                     label: "photos",
-                     icon: "photo.fill",
-                     color: .green)
-                chip(value: "\(photo.items.filter { $0.coordinate != nil }.count)",
-                     label: "w/ GPS",
-                     icon: "location.fill",
-                     color: .orange)
-                chip(value: "\(photo.placeCandidates.count)",
-                     label: "firsts",
-                     icon: "star.fill",
-                     color: .yellow)
+                chip(value: "\(loc.visits.count)", label: "visits", icon: "mappin.circle.fill", color: .blue)
+                chip(value: "\(store.places.count)", label: "places", icon: "star.fill", color: .yellow)
+                chip(value: "\(store.pendingReview.count)", label: "review", icon: "questionmark.circle.fill", color: .orange)
             }
             .padding(.vertical, 12)
 
@@ -39,24 +30,18 @@ struct WiringTestView: View {
                 actionButton("Fetch Location History", icon: "location.fill", color: .blue) {
                     loc.requestPermissionAndStart()
                 }
-                actionButton("Fetch Photo Metadata", icon: "photo.fill", color: .green) {
-                    photo.requestPermissionAndFetch()
+                actionButton(store.isImporting ? "Running…" : "Run Backfill", icon: "arrow.clockwise", color: .green) {
+                    Task { await store.runBackfill() }
                 }
             }
             .padding(.horizontal, 14)
-
-            Button(action: clearGeocodeCache) {
-                Label("Clear Geocode Cache", systemImage: "trash")
-                    .font(.caption.weight(.medium))
-                    .foregroundColor(.red)
-                    .padding(.vertical, 6)
-            }
+            .disabled(store.isImporting)
 
             // — Tab picker —
             Picker("View", selection: $selectedTab) {
                 Text("Log").tag(0)
-                Text("Clusters (\(photo.clusters.count))").tag(1)
-                Text("Firsts (\(photo.placeCandidates.count))").tag(2)
+                Text("Places (\(store.places.count))").tag(1)
+                Text("Review (\(store.pendingReview.count))").tag(2)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 14)
@@ -65,8 +50,8 @@ struct WiringTestView: View {
             Divider().padding(.top, 8)
 
             switch selectedTab {
-            case 1:  clusterList
-            case 2:  firstsList
+            case 1:  placesList
+            case 2:  reviewList
             default: logView
             }
         }
@@ -78,14 +63,11 @@ struct WiringTestView: View {
                 logCounter += 1
             }
         }
-        .onChange(of: photo.log) { old, new in
+        .onChange(of: store.log) { old, new in
             for line in new.dropFirst(old.count) {
-                mergedLog.append((id: logCounter, line: "[PHOTO] \(line)"))
+                mergedLog.append((id: logCounter, line: "[STORE] \(line)"))
                 logCounter += 1
             }
-        }
-        .onChange(of: photo.placeCandidates.count) { _, count in
-            if count > 0 { selectedTab = 2 }
         }
     }
 
@@ -110,15 +92,15 @@ struct WiringTestView: View {
         }
     }
 
-    // MARK: - Clusters (raw per-day)
+    // MARK: - Places
 
-    private var clusterList: some View {
+    private var placesList: some View {
         Group {
-            if photo.clusters.isEmpty {
-                emptyState(icon: "square.stack.3d.up.slash", text: "No clusters yet — fetch photo metadata first.")
+            if store.places.isEmpty {
+                emptyState(icon: "star.slash", text: "No places yet — run a backfill first.")
             } else {
-                List(photo.clusters) { cluster in
-                    clusterRow(cluster)
+                List(store.places) { summary in
+                    placeRow(summary)
                 }
                 .listStyle(.plain)
             }
@@ -126,62 +108,7 @@ struct WiringTestView: View {
     }
 
     @ViewBuilder
-    private func clusterRow(_ cluster: PhotoCluster) -> some View {
-        let fmt: DateFormatter = {
-            let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none; return f
-        }()
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.purple.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                VStack(spacing: 0) {
-                    Text("\(cluster.count)")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundColor(.purple)
-                    Text("📷").font(.system(size: 10))
-                }
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(String(format: "%.4f,  %.4f",
-                            cluster.centroid.latitude,
-                            cluster.centroid.longitude))
-                    .font(.system(size: 12, design: .monospaced))
-                Text(fmt.string(from: cluster.day))
-                    .font(.caption).foregroundColor(.secondary)
-                Text("\(cluster.count) photo\(cluster.count == 1 ? "" : "s")")
-                    .font(.caption).foregroundColor(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Firsts (cross-day unique places)
-
-    private var firstsList: some View {
-        Group {
-            if photo.placeCandidates.isEmpty {
-                emptyState(icon: "star.slash", text: "No unique places yet — fetch photo metadata first.")
-            } else {
-                if photo.isGeocodingPlaces {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                        Text("Geocoding place names…")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 6)
-                }
-                List(photo.placeCandidates) { candidate in
-                    candidateRow(candidate)
-                }
-                .listStyle(.plain)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func candidateRow(_ candidate: PlaceCandidate) -> some View {
+    private func placeRow(_ summary: PlaceSummary) -> some View {
         let dateFmt: DateFormatter = {
             let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none; return f
         }()
@@ -192,42 +119,50 @@ struct WiringTestView: View {
                     .frame(width: 44, height: 44)
                 VStack(spacing: 1) {
                     Text("⭐️").font(.system(size: 18))
-                    Text("\(candidate.visitCount)×")
+                    Text("\(summary.visitCount)×")
                         .font(.system(size: 9, weight: .semibold, design: .rounded))
                         .foregroundColor(.secondary)
                 }
             }
-
             VStack(alignment: .leading, spacing: 3) {
-                if let name = candidate.placeName {
-                    Text(name).font(.subheadline.weight(.semibold))
-                } else if photo.isGeocodingPlaces {
-                    HStack(spacing: 5) {
-                        ProgressView().scaleEffect(0.7)
-                        Text("Resolving…").font(.subheadline).foregroundColor(.secondary)
-                    }
-                } else {
-                    Text(String(format: "%.4f, %.4f",
-                                candidate.centroid.latitude,
-                                candidate.centroid.longitude))
-                        .font(.system(size: 12, design: .monospaced))
-                }
-                Text("First visit: \(dateFmt.string(from: candidate.firstVisitDate))")
+                Text(summary.placeName).font(.subheadline.weight(.semibold))
+                Text("First visit: \(dateFmt.string(from: summary.firstVisitDate))")
                     .font(.caption).foregroundColor(.secondary)
-                Text("\(candidate.visitCount) day\(candidate.visitCount == 1 ? "" : "s") · \(candidate.totalPhotoCount) photo\(candidate.totalPhotoCount == 1 ? "" : "s")")
+                Text("\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s") · \(summary.totalPhotoCount) photo\(summary.totalPhotoCount == 1 ? "" : "s")")
                     .font(.caption).foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)
     }
 
-    // MARK: - Cache management
+    // MARK: - Review
 
-    private func clearGeocodeCache() {
-        let defaults = UserDefaults.standard
-        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("geocache_") {
-            defaults.removeObject(forKey: key)
+    private var reviewList: some View {
+        Group {
+            if store.pendingReview.isEmpty {
+                emptyState(icon: "checkmark.circle", text: "Nothing needs review.")
+            } else {
+                List(store.pendingReview) { candidate in
+                    reviewRow(candidate)
+                }
+                .listStyle(.plain)
+            }
         }
+    }
+
+    @ViewBuilder
+    private func reviewRow(_ candidate: ReviewCandidate) -> some View {
+        let dateFmt: DateFormatter = {
+            let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
+        }()
+        VStack(alignment: .leading, spacing: 3) {
+            Text(candidate.placeName).font(.subheadline.weight(.semibold))
+            Text(dateFmt.string(from: candidate.firstVisitDate))
+                .font(.caption).foregroundColor(.secondary)
+            Text("\(candidate.totalPhotoCount) photo\(candidate.totalPhotoCount == 1 ? "" : "s")")
+                .font(.caption).foregroundColor(.secondary)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Shared sub-views

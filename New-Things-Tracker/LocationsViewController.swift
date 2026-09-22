@@ -63,7 +63,8 @@ class LocationsViewController: UIViewController {
         if let data = try? JSONEncoder().encode(locations) {
             UserDefaults.standard.set(data, forKey: "savedLocations")
         }
-        // Keep legacy keys in sync so PhotoMetadataManager continues to work
+        // Keep legacy keys in sync — ViewController.prewarmMapRegion() still reads these directly,
+        // and LegacyMigration reads the "savedLocations" JSON once to seed home/work corrections.
         if let home = locations.first(where: { $0.id == "home" }),
            let lat = home.latitude, let lon = home.longitude {
             UserDefaults.standard.set(lat,              forKey: "homeLatitude")

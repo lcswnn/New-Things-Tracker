@@ -9,12 +9,29 @@ import UIKit
 import MapKit
 import SwiftUI
 import Combine
+import SwiftData
+import Photos
 
 
 class ViewController: UIViewController {
 
     private enum Tab { case home, discover, stats, map }
     private var currentTab: Tab = .home
+
+    // Home feed table structure. FeedItem.first is keyed by the Place's real PersistentIdentifier.
+    // Explicitly nonisolated: UITableViewDiffableDataSource requires Sendable section/item types,
+    // but the app target's SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor would otherwise make these
+    // nested types MainActor-isolated (and therefore not Sendable).
+    private nonisolated enum FeedSection: Hashable {
+        case review
+        case mostRecent
+        case month(Date)
+    }
+
+    private nonisolated enum FeedItem: Hashable {
+        case reviewCarousel
+        case first(PersistentIdentifier)
+    }
 
     // Island bar sits 60pt tall + 16pt gap above safeAreaLayoutGuide.bottomAnchor
     private let islandClearance: CGFloat = 60 + 16 + 10
@@ -43,15 +60,19 @@ class ViewController: UIViewController {
     private var isMapMoving = false
     private var profileImage: UIImage?
 
+    // Set by SceneDelegate.scene(_:willConnectTo:) before viewDidAppear runs. Never read before
+    // viewDidAppear — UIKit can call viewDidLoad before scene(_:willConnectTo:) runs.
+    var environment: AppEnvironment!
+
     // Live data pipeline
-    private let photoManager    = PhotoMetadataManager()
     private let locationManager = LocationHistoryManager()
     private var cancellables    = Set<AnyCancellable>()
     private var hasRequestedPermissions = false
-    private var mostRecentFirst: First?
-    private var mostRecentCandidate: PlaceCandidate?
-    private var pastSections: [(month: String, firsts: [First], candidates: [PlaceCandidate])] = []
-    private var pendingCandidates: [PlaceCandidate] = []
+    private var dataSource: UITableViewDiffableDataSource<FeedSection, FeedItem>!
+    private var viewModelsByID: [PersistentIdentifier: FirstCardViewModel] = [:]
+    private var placesByID: [PersistentIdentifier: PlaceSummary] = [:]
+    private var mostRecentID: PersistentIdentifier?
+    private var pendingReviewItems: [ReviewItem] = []
     private weak var statsTotalLabel: UILabel?
     private weak var statsMonthLabel: UILabel?
     private weak var statsStreakLabel: UILabel?
@@ -94,15 +115,6 @@ class ViewController: UIViewController {
         setupHeaderLine()
         setupNavBar()           // last — stays above all content
 
-        // Rebuild home cards whenever the place-candidate list changes (initial load + geocoding updates)
-        photoManager.$placeCandidates
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] candidates in
-                self?.rebuildSections()
-                self?.discoverVC.updateVisitedCandidates(candidates)
-            }
-            .store(in: &cancellables)
-
         // Start off-screen for entrance animation
         let offscreen = CGAffineTransform(translationX: 0, y: 120)
         navBarViews.forEach { $0.transform = offscreen; $0.alpha = 0 }
@@ -114,8 +126,12 @@ class ViewController: UIViewController {
 
         if !hasRequestedPermissions {
             hasRequestedPermissions = true
+            subscribeToStore()
+            locationManager.onVisit = { [weak self] visit in
+                self?.environment.store.recordVisit(visit)
+            }
             locationManager.requestPermissionAndStart()
-            photoManager.requestPermissionAndFetch()
+            requestPhotoAccessAndRunBackfill()
         }
         let delays: [Double] = [0.06, 0.12, 0.06]
         for (view, delay) in zip(navBarViews, delays) {
@@ -123,6 +139,35 @@ class ViewController: UIViewController {
                 view.transform = .identity
                 view.alpha = 1
             }
+        }
+    }
+
+    // Rebuilds the home feed whenever the store's places or pending review queue changes (initial
+    // load, and after every backfill run). One diff per commit, not one reload per resolved place.
+    private func subscribeToStore() {
+        environment.store.$places
+            .combineLatest(environment.store.$pendingReview)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] places, _ in
+                self?.applySnapshot()
+                self?.discoverVC.updateVisitedCoordinates(places.map { $0.centroid })
+            }
+            .store(in: &cancellables)
+    }
+
+    // FirstsImporter reads PHAsset directly, so the system permission prompt still has to happen
+    // here before the first backfill can see anything.
+    private func requestPhotoAccessAndRunBackfill() {
+        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        case .authorized, .limited:
+            Task { await environment.store.runBackfill() }
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
+                guard status == .authorized || status == .limited else { return }
+                Task { @MainActor in await self?.environment.store.runBackfill() }
+            }
+        default:
+            break
         }
     }
 
@@ -283,7 +328,6 @@ class ViewController: UIViewController {
         tableView.register(FirstCardCell.self,    forCellReuseIdentifier: FirstCardCell.identifier)
         tableView.register(PastFirstRowCell.self, forCellReuseIdentifier: PastFirstRowCell.identifier)
         tableView.register(ReviewCardCell.self,   forCellReuseIdentifier: ReviewCardCell.identifier)
-        tableView.dataSource = self
         tableView.delegate = self
         view.addSubview(tableView)
 
@@ -293,7 +337,31 @@ class ViewController: UIViewController {
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        configureDataSource()
         buildAndAttachStatsHeader()
+    }
+
+    private func configureDataSource() {
+        dataSource = UITableViewDiffableDataSource<FeedSection, FeedItem>(tableView: tableView) { [weak self] tableView, indexPath, item in
+            guard let self else { return UITableViewCell() }
+            switch item {
+            case .reviewCarousel:
+                let cell = tableView.dequeueReusableCell(withIdentifier: ReviewCardCell.identifier, for: indexPath) as! ReviewCardCell
+                cell.configure(with: self.pendingReviewItems, delegate: self)
+                return cell
+            case .first(let key):
+                guard let viewModel = self.viewModelsByID[key] else { return UITableViewCell() }
+                if key == self.mostRecentID {
+                    let cell = tableView.dequeueReusableCell(withIdentifier: FirstCardCell.identifier, for: indexPath) as! FirstCardCell
+                    cell.configure(with: viewModel)
+                    return cell
+                } else {
+                    let cell = tableView.dequeueReusableCell(withIdentifier: PastFirstRowCell.identifier, for: indexPath) as! PastFirstRowCell
+                    cell.configure(with: viewModel)
+                    return cell
+                }
+            }
+        }
     }
 
     private func setupHeaderLine() {
@@ -471,7 +539,7 @@ class ViewController: UIViewController {
         let profileVC = ProfileViewController()
         profileVC.delegate = self
         profileVC.initialImage = profileImage
-        profileVC.placeCandidates = photoManager.placeCandidates
+        profileVC.placeCandidates = environment.store.places
         profileVC.modalPresentationStyle = .pageSheet
         if let sheet = profileVC.sheetPresentationController {
             sheet.detents = [.large()]
@@ -525,8 +593,25 @@ class ViewController: UIViewController {
         if tab == .discover {
             discoverVC.refreshIfNeeded()
         }
+        if tab == .map {
+            refreshCoarseFirstAnnotations()
+        }
 
         updateIslandSelection()
+    }
+
+    // Neighborhood/city/region/country Firsts as map pins — the place-level feed on Home stays
+    // place-only, so this is the only place coarse Firsts are surfaced at all.
+    private func refreshCoarseFirstAnnotations() {
+        mapView.removeAnnotations(mapView.annotations)
+        let annotations = environment.store.coarseFirsts().map { first -> MKPointAnnotation in
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = first.coordinate
+            annotation.title = first.title
+            annotation.subtitle = first.level.rawValue.capitalized
+            return annotation
+        }
+        mapView.addAnnotations(annotations)
     }
 
     private func updateIslandSelection() {
@@ -657,37 +742,26 @@ class ViewController: UIViewController {
 
     // MARK: - Review queue helpers
 
-    private func centroidKey(_ coord: CLLocationCoordinate2D) -> String {
-        "place_\(String(format: "%.3f", coord.latitude))_\(String(format: "%.3f", coord.longitude))"
+    // Stable per-place color index so cards don't reshuffle colors whenever the sorted places
+    // list changes (an FNV-1a hash of the place's canonical key, not the array index).
+    private func stableColorIndex(for key: String) -> Int {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in key.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return Int(hash % UInt64(cardColors.count))
     }
 
-    private var reviewedPlaceKeys: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: "reviewedPlaceKeys") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue), forKey: "reviewedPlaceKeys") }
-    }
-
-    private var reviewSectionOffset: Int { pendingCandidates.isEmpty ? 0 : 1 }
-    private var hasMostRecentSection: Bool { mostRecentFirst != nil }
-    private var mostRecentSectionIndex: Int? { hasMostRecentSection ? reviewSectionOffset : nil }
-    // Past firsts render as one table section per month; this is where that run of sections starts.
-    private var pastSectionStartIndex: Int? {
-        guard !pastSections.isEmpty else { return nil }
-        return reviewSectionOffset + (hasMostRecentSection ? 1 : 0)
-    }
-    private func pastGroupIndex(forSection section: Int) -> Int? {
-        guard let start = pastSectionStartIndex, section >= start, section < start + pastSections.count else { return nil }
-        return section - start
-    }
-
-    private func monthStreak(from candidates: [PlaceCandidate]) -> Int {
-        guard !candidates.isEmpty else { return 0 }
+    private func monthStreak(from places: [PlaceSummary]) -> Int {
+        guard !places.isEmpty else { return 0 }
         let calendar = Calendar.current
         var comps = calendar.dateComponents([.year, .month], from: Date())
         var streak = 0
         for _ in 0..<24 {
-            let hasPlace = candidates.contains { c in
-                let cc = calendar.dateComponents([.year, .month], from: c.firstVisitDate)
-                return cc.year == comps.year && cc.month == comps.month
+            let hasPlace = places.contains { p in
+                let pc = calendar.dateComponents([.year, .month], from: p.firstVisitDate)
+                return pc.year == comps.year && pc.month == comps.month
             }
             if hasPlace {
                 streak += 1
@@ -697,15 +771,15 @@ class ViewController: UIViewController {
         return streak
     }
 
-    private func updateStatsHeader(candidates: [PlaceCandidate]) {
+    private func updateStatsHeader(places: [PlaceSummary]) {
         let calendar = Calendar.current
         let thisComps = calendar.dateComponents([.year, .month], from: Date())
-        let thisMonthCount = candidates.filter {
-            let c = calendar.dateComponents([.year, .month], from: $0.firstVisitDate)
-            return c.year == thisComps.year && c.month == thisComps.month
+        let thisMonthCount = places.filter {
+            let p = calendar.dateComponents([.year, .month], from: $0.firstVisitDate)
+            return p.year == thisComps.year && p.month == thisComps.month
         }.count
-        let streak = monthStreak(from: candidates)
-        statsTotalLabel?.text  = candidates.isEmpty ? "—" : "\(candidates.count)"
+        let streak = monthStreak(from: places)
+        statsTotalLabel?.text  = places.isEmpty ? "—" : "\(places.count)"
         statsMonthLabel?.text  = "\(thisMonthCount)"
         statsStreakLabel?.text = "\(max(streak, 0))"
     }
@@ -729,86 +803,84 @@ class ViewController: UIViewController {
         return container
     }
 
-    private func markReviewed(_ candidate: PlaceCandidate) {
-        var keys = reviewedPlaceKeys
-        keys.insert(centroidKey(candidate.centroid))
-        reviewedPlaceKeys = keys
-
-        let wasLastPending = pendingCandidates.count == 1
-        pendingCandidates.removeAll { centroidKey($0.centroid) == centroidKey(candidate.centroid) }
-
-        if wasLastPending {
-            // The whole "needs your input" section (header + card) collapses away and the
-            // sections below animate up to fill the space, instead of an abrupt reload.
-            tableView.deleteSections(IndexSet(integer: 0), with: .fade)
-        } else {
-            tableView.reloadData()
-        }
-    }
-
     // MARK: - Home feed
 
-    private func rebuildSections() {
-        let candidates = photoManager.placeCandidates
+    private func applySnapshot(animatingDifferences: Bool = true) {
+        let places = environment.store.places
+        let pending = environment.store.pendingReview
 
-        updateStatsHeader(candidates: candidates)
+        updateStatsHeader(places: places)
 
-        let reviewed = reviewedPlaceKeys
-        pendingCandidates = Array(candidates.filter { c in
-            c.visitCount == 1 && !reviewed.contains(centroidKey(c.centroid))
-        }.prefix(5))
+        pendingReviewItems = pending.map { candidate in
+            ReviewItem(
+                id: candidate.id,
+                label: candidate.placeName,
+                date: reviewDateFormatter.string(from: candidate.firstVisitDate),
+                reason: "\(candidate.totalPhotoCount) photo\(candidate.totalPhotoCount == 1 ? "" : "s")",
+                photoLocalIDs: candidate.photoLocalIDs
+            )
+        }
 
-        guard !candidates.isEmpty else {
-            mostRecentFirst = nil; mostRecentCandidate = nil
-            pastSections = []
-            tableView.reloadData()
+        var snapshot = NSDiffableDataSourceSnapshot<FeedSection, FeedItem>()
+        if !pending.isEmpty {
+            snapshot.appendSections([.review])
+            snapshot.appendItems([.reviewCarousel], toSection: .review)
+        }
+
+        viewModelsByID.removeAll()
+        placesByID.removeAll()
+        mostRecentID = nil
+
+        guard !places.isEmpty else {
+            dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
             return
         }
 
         // Most recent first up top as the big card; everything older is grouped by month below.
-        let sortedCandidates = candidates.sorted { $0.firstVisitDate > $1.firstVisitDate }
+        let sortedPlaces = places.sorted { $0.firstVisitDate > $1.firstVisitDate }
 
-        let firsts: [First] = sortedCandidates.enumerated().map { index, c in
-            let (large, small) = cardColors[index % cardColors.count]
-            return First(
-                title:           c.placeName ?? "…",
-                location:        "\(c.visitCount) visit\(c.visitCount == 1 ? "" : "s")",
+        for summary in sortedPlaces {
+            placesByID[summary.id] = summary
+            let (large, small) = cardColors[stableColorIndex(for: summary.key)]
+            viewModelsByID[summary.id] = FirstCardViewModel(
+                title:           summary.placeName,
+                location:        "\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s")",
                 category:        "Place",
-                date:            cardDateFormatter.string(from: c.firstVisitDate),
-                duration:        "\(c.totalPhotoCount) photo\(c.totalPhotoCount == 1 ? "" : "s")",
+                date:            cardDateFormatter.string(from: summary.firstVisitDate),
+                duration:        "\(summary.totalPhotoCount) photo\(summary.totalPhotoCount == 1 ? "" : "s")",
                 photoCount:      0,
-                extraPhotos:     max(0, c.totalPhotoCount - 2),
+                extraPhotos:     max(0, summary.totalPhotoCount - 2),
                 largePhotoColor: large,
                 smallPhotoColor: small,
-                photoLocalIDs:   c.photoLocalIDs
+                photoLocalIDs:   summary.photoLocalIDs
             )
         }
 
-        mostRecentFirst     = firsts.first
-        mostRecentCandidate = sortedCandidates.first
+        let mostRecent = sortedPlaces[0]
+        mostRecentID = mostRecent.id
+        snapshot.appendSections([.mostRecent])
+        snapshot.appendItems([.first(mostRecent.id)], toSection: .mostRecent)
 
-        let pastFirsts      = Array(firsts.dropFirst())
-        let pastCandidates  = Array(sortedCandidates.dropFirst())
-
+        let pastPlaces = Array(sortedPlaces.dropFirst())
         let calendar = Calendar.current
         var monthOrder: [Date] = []
-        var grouped: [Date: (firsts: [First], candidates: [PlaceCandidate])] = [:]
+        var grouped: [Date: [PlaceSummary]] = [:]
 
-        for (first, candidate) in zip(pastFirsts, pastCandidates) {
-            let comps = calendar.dateComponents([.year, .month], from: candidate.firstVisitDate)
+        for summary in pastPlaces {
+            let comps = calendar.dateComponents([.year, .month], from: summary.firstVisitDate)
             let key   = calendar.date(from: comps)!
-            if grouped[key] == nil { grouped[key] = ([], []); monthOrder.append(key) }
-            grouped[key]!.firsts.append(first)
-            grouped[key]!.candidates.append(candidate)
+            if grouped[key] == nil { grouped[key] = []; monthOrder.append(key) }
+            grouped[key]!.append(summary)
         }
 
         monthOrder.sort { $0 > $1 }
-        pastSections = monthOrder.map { key in
-            let group = grouped[key]!
-            return (month: monthHeaderFormatter.string(from: key).uppercased(), firsts: group.firsts, candidates: group.candidates)
+        for monthKey in monthOrder {
+            let section = FeedSection.month(monthKey)
+            snapshot.appendSections([section])
+            snapshot.appendItems(grouped[monthKey]!.map { .first($0.id) }, toSection: section)
         }
 
-        tableView.reloadData()
+        dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
     }
 
     // Shake device OR long-press the greeting label to open the data-wiring debug screen
@@ -823,7 +895,7 @@ class ViewController: UIViewController {
     }
 
     private func presentDebugScreen() {
-        let host = UIHostingController(rootView: NavigationView { WiringTestView() })
+        let host = UIHostingController(rootView: NavigationView { WiringTestView(environment: environment) })
         host.modalPresentationStyle = .pageSheet
         present(host, animated: true)
     }
@@ -836,19 +908,28 @@ extension ViewController: ProfileViewControllerDelegate {
 }
 
 extension ViewController: ReviewCardCellDelegate {
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesAt index: Int) {
-        guard index < pendingCandidates.count else { return }
-        markReviewed(pendingCandidates[index])
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesFor id: PersistentIdentifier) {
+        Task { await environment.store.confirmTopCandidate(forStayID: id) }
     }
 
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoAt index: Int) {
-        guard index < pendingCandidates.count else { return }
-        markReviewed(pendingCandidates[index])
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoFor id: PersistentIdentifier) {
+        presentReviewSheet(for: id)
     }
 
-    func reviewCardCell(_ cell: ReviewCardCell, didTapCardAt index: Int) {
-        guard index < pendingCandidates.count else { return }
-        presentPlaceDetail(for: pendingCandidates[index])
+    func reviewCardCell(_ cell: ReviewCardCell, didTapCardFor id: PersistentIdentifier) {
+        presentReviewSheet(for: id)
+    }
+
+    private func presentReviewSheet(for stayID: PersistentIdentifier) {
+        guard let candidate = environment.store.pendingReview.first(where: { $0.id == stayID }) else { return }
+        let sheet = PlaceReviewSheet(candidate: candidate, store: environment.store)
+        sheet.modalPresentationStyle = .pageSheet
+        if let presentation = sheet.sheetPresentationController {
+            presentation.detents = [.medium(), .large()]
+            presentation.prefersGrabberVisible = true
+            presentation.preferredCornerRadius = 24
+        }
+        present(sheet, animated: true)
     }
 }
 
@@ -864,72 +945,32 @@ extension ViewController: MKMapViewDelegate {
     }
 }
 
-extension ViewController: UITableViewDataSource, UITableViewDelegate {
-
-    func numberOfSections(in tableView: UITableView) -> Int {
-        reviewSectionOffset + (hasMostRecentSection ? 1 : 0) + pastSections.count
-    }
-
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if section == 0 && !pendingCandidates.isEmpty { return 1 }
-        if section == mostRecentSectionIndex { return 1 }
-        if let group = pastGroupIndex(forSection: section) { return pastSections[group].firsts.count }
-        return 0
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == 0 && !pendingCandidates.isEmpty {
-            let cell = tableView.dequeueReusableCell(withIdentifier: ReviewCardCell.identifier, for: indexPath) as! ReviewCardCell
-            let items = pendingCandidates.map { c in
-                ReviewItem(
-                    label: c.placeName ?? "Somewhere new",
-                    date: reviewDateFormatter.string(from: c.firstVisitDate),
-                    reason: "\(c.totalPhotoCount) photo\(c.totalPhotoCount == 1 ? "" : "s")",
-                    photoLocalIDs: c.photoLocalIDs
-                )
-            }
-            cell.configure(with: items, delegate: self)
-            return cell
-        }
-        if indexPath.section == mostRecentSectionIndex, let first = mostRecentFirst {
-            let cell = tableView.dequeueReusableCell(withIdentifier: FirstCardCell.identifier, for: indexPath) as! FirstCardCell
-            cell.configure(with: first)
-            return cell
-        }
-        guard let group = pastGroupIndex(forSection: indexPath.section) else {
-            return UITableViewCell()
-        }
-        let cell = tableView.dequeueReusableCell(withIdentifier: PastFirstRowCell.identifier, for: indexPath) as! PastFirstRowCell
-        cell.configure(with: pastSections[group].firsts[indexPath.row])
-        return cell
-    }
+extension ViewController: UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        if section == 0 && !pendingCandidates.isEmpty { return makeHeaderView("NEEDS YOUR INPUT") }
-        if section == mostRecentSectionIndex { return makeHeaderView("MOST RECENT 'FIRST'") }
-        if let group = pastGroupIndex(forSection: section) { return makeHeaderView(pastSections[group].month) }
-        return nil
+        guard let dataSource, section < dataSource.snapshot().sectionIdentifiers.count else { return nil }
+        switch dataSource.snapshot().sectionIdentifiers[section] {
+        case .review:      return makeHeaderView("NEEDS YOUR INPUT")
+        case .mostRecent:  return makeHeaderView("MOST RECENT 'FIRST'")
+        case .month(let date): return makeHeaderView(monthHeaderFormatter.string(from: date).uppercased())
+        }
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 36 }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        if indexPath.section == 0 && !pendingCandidates.isEmpty { return }
-        let candidate: PlaceCandidate?
-        if indexPath.section == mostRecentSectionIndex {
-            candidate = mostRecentCandidate
-        } else if let group = pastGroupIndex(forSection: indexPath.section), indexPath.row < pastSections[group].candidates.count {
-            candidate = pastSections[group].candidates[indexPath.row]
-        } else {
-            candidate = nil
+        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+        switch item {
+        case .reviewCarousel:
+            return
+        case .first(let id):
+            presentPlaceDetail(for: id)
         }
-        guard let candidate else { return }
-        presentPlaceDetail(for: candidate)
     }
 
-    private func presentPlaceDetail(for candidate: PlaceCandidate) {
-        let detailVC = PlaceDetailViewController(candidate: candidate)
+    private func presentPlaceDetail(for placeID: PersistentIdentifier) {
+        let detailVC = PlaceDetailViewController(placeID: placeID, store: environment.store)
         detailVC.modalPresentationStyle = .pageSheet
         if let sheet = detailVC.sheetPresentationController {
             sheet.detents = [.large()]

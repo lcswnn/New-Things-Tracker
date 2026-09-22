@@ -1,5 +1,6 @@
 import UIKit
 import Photos
+import SwiftData
 
 extension UIFont {
     // Fraunces — serif display font for titles and headers
@@ -26,7 +27,7 @@ extension UIFont {
     }
 }
 
-struct First {
+struct FirstCardViewModel {
     let title: String
     let location: String
     let category: String
@@ -247,7 +248,7 @@ class FirstCardCell: UITableViewCell {
         smallImageView.image  = nil
     }
 
-    func configure(with first: First) {
+    func configure(with first: FirstCardViewModel) {
         cancelImageRequests()
         largeImageView.image = nil
         smallImageView.image  = nil
@@ -381,7 +382,7 @@ class PastFirstRowCell: UITableViewCell {
         ])
     }
 
-    func configure(with first: First) {
+    func configure(with first: FirstCardViewModel) {
         swatch.backgroundColor = first.largePhotoColor
         titleLabel.text = first.title
         subtitleLabel.text = "\(first.date) · \(first.location)"
@@ -402,6 +403,7 @@ struct Occasion {
 // MARK: - ReviewItem model
 
 struct ReviewItem {
+    let id: PersistentIdentifier
     let label: String
     let date: String
     let reason: String
@@ -531,9 +533,9 @@ class OccasionCell: UITableViewCell {
 // MARK: - ReviewCardCell
 
 protocol ReviewCardCellDelegate: AnyObject {
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesAt index: Int)
-    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoAt index: Int)
-    func reviewCardCell(_ cell: ReviewCardCell, didTapCardAt index: Int)
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerYesFor id: PersistentIdentifier)
+    func reviewCardCell(_ cell: ReviewCardCell, didAnswerNoFor id: PersistentIdentifier)
+    func reviewCardCell(_ cell: ReviewCardCell, didTapCardFor id: PersistentIdentifier)
 }
 
 // Single table row holding a horizontally-paged stack of ReviewPageCells, one per place needing input,
@@ -677,22 +679,25 @@ extension ReviewCardCell: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ReviewPageCell.identifier, for: indexPath) as! ReviewPageCell
-        cell.configure(with: items[indexPath.item])
+        // Capture the item's stable id (not indexPath.item) so a delegate callback that fires after
+        // `items` has already been mutated by a later `configure(with:)` still resolves to the right place.
+        let item = items[indexPath.item]
+        cell.configure(with: item)
         cell.onYes = { [weak self] in
             guard let self else { return }
             self.answerAndAdvance(from: indexPath.item) {
-                self.delegate?.reviewCardCell(self, didAnswerYesAt: indexPath.item)
+                self.delegate?.reviewCardCell(self, didAnswerYesFor: item.id)
             }
         }
         cell.onNo = { [weak self] in
             guard let self else { return }
             self.answerAndAdvance(from: indexPath.item) {
-                self.delegate?.reviewCardCell(self, didAnswerNoAt: indexPath.item)
+                self.delegate?.reviewCardCell(self, didAnswerNoFor: item.id)
             }
         }
         cell.onTapCard = { [weak self] in
             guard let self else { return }
-            self.delegate?.reviewCardCell(self, didTapCardAt: indexPath.item)
+            self.delegate?.reviewCardCell(self, didTapCardFor: item.id)
         }
         return cell
     }

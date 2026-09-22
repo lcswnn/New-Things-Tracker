@@ -17,7 +17,7 @@ class DiscoverViewController: UIViewController {
     private let locationManager = CLLocationManager()
     private let distanceFormatter = MKDistanceFormatter()
     private var activeSearches: [MKLocalSearch] = []
-    private var visitedCandidates: [PlaceCandidate] = []
+    private var visitedCoordinates: [CLLocationCoordinate2D] = []
     private var nearbyMapItems: [MKMapItem] = []
     private var allRankedResults: [(item: MKMapItem, distance: CLLocationDistance)] = []
     private var displayedResults: [(item: MKMapItem, distance: CLLocationDistance)] = []
@@ -305,8 +305,8 @@ class DiscoverViewController: UIViewController {
     // MARK: - Nearby-firsts pipeline (public API for the parent view controller)
 
     // Snapshot of the places the user has already visited, so real POI results can exclude them.
-    func updateVisitedCandidates(_ candidates: [PlaceCandidate]) {
-        visitedCandidates = candidates
+    func updateVisitedCoordinates(_ coordinates: [CLLocationCoordinate2D]) {
+        visitedCoordinates = coordinates
     }
 
     // Called by the parent view controller when this tab becomes active. Loads once per session;
@@ -425,8 +425,8 @@ class DiscoverViewController: UIViewController {
         }
 
         let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
-        let visitedLocations = visitedCandidates.map {
-            CLLocation(latitude: $0.centroid.latitude, longitude: $0.centroid.longitude)
+        let visitedLocations = visitedCoordinates.map {
+            CLLocation(latitude: $0.latitude, longitude: $0.longitude)
         }
 
         allRankedResults = mapItems
