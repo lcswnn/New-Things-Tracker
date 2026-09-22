@@ -24,8 +24,8 @@
                         <constraints>
                             <constraint firstItem="lgo-im-age" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="cx1-ab-cde"/>
                             <constraint firstItem="lgo-im-age" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cy1-ab-cde"/>
-                            <constraint firstItem="lgo-im-age" firstAttribute="height" constant="75" id="ht1-ab-cde"/>
-                            <constraint firstItem="lgo-im-age" firstAttribute="width" constant="75" id="wd1-ab-cde"/>
+                            <constraint firstItem="lgo-im-age" firstAttribute="height" constant="130" id="ht1-ab-cde"/>
+                            <constraint firstItem="lgo-im-age" firstAttribute="width" constant="130" id="wd1-ab-cde"/>
                         </constraints>
                     </view>
                 </viewController>
